@@ -7,7 +7,7 @@ from pathlib import Path
 import os
 
 load_dotenv()
-env_path = Path('venv') / 'token.env'
+env_path = Path('discord_bot') / 'token.env'
 print(env_path)
 load_dotenv(dotenv_path=env_path)
 
