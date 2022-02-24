@@ -1,6 +1,16 @@
-settings = {
-    'token': 'OTQ1NzE3MTUxODMzMTMzMDc2.YhUNuw.HaAbqz-JU3xditJ2Yja6JAG0yLo',
-    'bot': 'Meme-Sound',
-    'id': 945717151833133076,
-    'prefix': 'e737467e4aea41acb03a25e483cbf296054f0ab0a2149d470a026a34d690ca36'
-}
+# settings.py
+# importing the load_dotenv from the python-dotenv module
+from dotenv import load_dotenv
+
+# using existing module to specify location of the .env file
+from pathlib import Path
+import os
+
+load_dotenv()
+env_path = Path('venv') / 'token.env'
+print(env_path)
+load_dotenv(dotenv_path=env_path)
+
+# retrieving keys and adding them to the project
+# from the .env file through their key names
+TOKEN = os.getenv("TOKEN")
