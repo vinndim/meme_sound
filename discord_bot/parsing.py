@@ -1,8 +1,6 @@
 import asyncio
 
 from discord import PCMVolumeTransformer
-from text_song import get_lyrics
-
 from discord_bot.config import ytdl
 
 
@@ -23,7 +21,3 @@ class YTDLSource(PCMVolumeTransformer):
             data = data['entries'][0]
         filename = data['title'] if stream else ytdl.prepare_filename(data)
         return filename, data['title']
-
-    async def get_text(self, artist, song):
-        print(get_lyrics(artist, song))
-

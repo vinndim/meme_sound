@@ -1,16 +1,29 @@
-import re
-import urllib.request
+import requests
 from bs4 import BeautifulSoup
 
+from selenium.webdriver.common.by import By
 
-def get_lyrics(url):
-    content = urllib.request.urlopen(url).read()
-    print(url)
-    print(content)
-    # lyrics lies between up_partition and down_partition
-    # up_partition = '<!-- Usage of azlyrics.com content by any third-party lyrics provider ' \
-    #                'is prohibited by our licensing agreement. Sorry about that. -->'
-    # down_partition = '<!-- MxM banner -->'
-    # lyrics = lyrics.split(up_partition)[1]
-    # lyrics = lyrics.split(down_partition)[0]
-    # lyrics = lyrics.replace('<br>', '').replace('</br>', '').replace('</div>', '').strip()
+from selenium.webdriver import Firefox
+from selenium.webdriver.firefox.options import Options
+
+opts = Options()
+
+opts.add_argument("--headless")  # без графического интерфейса.
+
+browser = Firefox(options=opts)
+
+
+def get_lyric(Song):
+    browser.get('https://genius.com/search?q=' + Song)
+    url = browser.find_element(by=By.CLASS_NAME, value='mini_card').get_attribute('href')
+    browser.quit()
+
+    soup = BeautifulSoup(requests.get(url).content, 'lxml')
+    text = ''
+    for tag in soup.select('div[class^="Lyrics__Container"], .song_body-lyrics p'):
+        text += tag.get_text(strip=True, separator='\n')
+    print(text)
+    return text
+
+
+print(get_lyric('SHADOWRAZE — SHOWDOWN'))
