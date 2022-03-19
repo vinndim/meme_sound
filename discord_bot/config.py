@@ -12,13 +12,11 @@ from bs4 import BeautifulSoup
 
 load_dotenv()
 env_path = "../discord_bot/token.env"
-print(env_path)
 load_dotenv(dotenv_path=env_path)
 
 # retrieving keys and adding them to the project
 # from the .env file through their key names
 TOKEN = os.getenv("TOKEN")
-print(TOKEN)
 yt_dlp.utils.bug_reports_message = lambda: ''
 ytdl_format_options = {
     'format': 'bestaudio/best',
