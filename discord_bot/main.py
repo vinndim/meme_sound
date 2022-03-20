@@ -1,31 +1,13 @@
 import discord
 import yt_dlp
+from discord import Client
 
 from discord.ext import commands
 
 from config import TOKEN
+from discord_bot.user_info import get_info
 from yt_video import YTDLSource
 from text_song import get_lyric
-
-yt_dlp.utils.bug_reports_message = lambda: 'yt_dlp error'
-
-ytdl_format_options = {
-    'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'noplaylist': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0'
-}
-
-ffmpeg_options = {
-    'options': '-vn'
-}
 
 
 class MemeSound(commands.Cog):
@@ -51,7 +33,7 @@ class MemeSound(commands.Cog):
             ctx.voice_client.play(player, after=lambda e: print(f'Player error: {e}') if e else None)
             self.title = player.title
 
-        await ctx.send(f'Now playing: {player.title}')
+        await ctx.send(f'**Now playing**: {player.title}')
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -81,11 +63,26 @@ class MemeSound(commands.Cog):
     @commands.command(name='text', help='Stops the song')
     async def text(self, ctx):
         async with ctx.typing():
-            await ctx.send(await get_lyric(self.title))
+            if self.title:
+                await ctx.send(f'{await get_lyric(self.title)}')
+            else:
+                await ctx.send("Нет названия песни")
+
+    @commands.command("info")
+    async def info(self, ctx, member: discord.Member = None, guild: discord.Guild = None):
+        async with ctx.typing():
+            await get_info(ctx, member, guild)
 
 
-bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"),
-                   description='Relatively simple music bot example')
+bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"))
+
+
+@bot.command(name="passwd")
+async def send_msg(ctx):
+    user_id = int(ctx.message.author.id)
+    user_chat = await bot.fetch_user(user_id)
+    print(user_chat)
+    await user_chat.send('**Ваш пароль:**')
 
 
 @bot.event

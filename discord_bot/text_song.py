@@ -1,5 +1,4 @@
 import re
-
 import requests
 from bs4 import BeautifulSoup
 
@@ -38,8 +37,10 @@ async def get_lyric(song):
             soup = BeautifulSoup(requests.get(url).content, 'lxml')
             for tag in soup.select('div[class^="Lyrics__Container"], .song_body-lyrics p'):
                 text += tag.get_text(strip=True, separator='\n')
-
-            return url + "/n" + text
+            if len(text) <= 2000:
+                return text
+            else:
+                return "Текст чет большой слишком"
         except Exception as e:
             print(e)
     return "**Не найдено на https://genius.com/**"
