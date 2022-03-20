@@ -8,10 +8,12 @@ from selenium.webdriver import Firefox
 from selenium.webdriver.firefox.options import Options
 
 opts = Options()
-opts.set_preference('general.useragent.override', 'whip')
 
 opts.add_argument("--headless")  # без графического интерфейса.
-browser = Firefox(options=opts)
+#for linux:
+#browser = Firefox(executable_path="../discord_bot/geckodriver", options=opts)
+#for windows:
+browser = Firefox(executable_path="../discord_bot/geckodriver", options=opts)
 site_with_text = "genius"
 
 

@@ -1,11 +1,9 @@
 import discord
-import yt_dlp
-from discord import Client
 
 from discord.ext import commands
 
 from config import TOKEN
-from discord_bot.user_info import get_info
+from user_info import get_info
 from yt_video import YTDLSource
 from text_song import get_lyric
 

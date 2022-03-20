@@ -6,6 +6,7 @@ async def get_info(ctx, member: discord.Member = None, guild: discord.Guild = No
     if member == None:
         emb = discord.Embed(title="Информация о пользователе", color=ctx.message.author.color)
         emb.add_field(name="Имя:", value=ctx.message.author.display_name, inline=False)
+
         emb.add_field(name="Айди пользователя:", value=ctx.message.author.id, inline=False)
         t = ctx.message.author.status
         if t == discord.Status.online:
