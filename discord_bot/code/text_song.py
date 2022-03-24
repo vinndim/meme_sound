@@ -12,10 +12,10 @@ opts = Options()
 opts.add_argument("--headless")  # без графического интерфейса.
 
 # for linux:
-# browser = Firefox(executable_path="../discord_bot/geckodriver", options=opts)
+browser = Firefox(executable_path="../utils/geckodriver", options=opts)
 
-# for windows:
-browser = Firefox(executable_path="../discord_bot/geckodriver", options=opts)
+# # for windows:
+# browser = Firefox(executable_path="../discord_bot/geckodriver", options=opts)
 site_with_text = "genius"
 
 

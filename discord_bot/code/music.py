@@ -7,6 +7,8 @@ import lavalink
 from discord import utils
 from discord import Embed
 
+from discord_bot.code.text_song import get_lyric
+
 
 class Music(commands.Cog):
     def __init__(self, bot):
@@ -15,36 +17,80 @@ class Music(commands.Cog):
         self.bot.music.add_node('localhost', 7000, 'testing', 'na', 'music-node')
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
+        self.title = ""
 
-    @commands.command(name='play')
+    @commands.command(name='play', aliases=['p', 'sing'])
     async def play(self, ctx, *, query):
-        try:
-            player = self.bot.music.player_manager.get(ctx.guild.id)
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+
+        query = query.strip('<>')
+
+        if not query.startswith('http'):
             query = f'ytsearch:{query}'
-            results = await player.node.get_tracks(query)
-            tracks = results['tracks'][0:10]
-            i = 0
-            query_result = ''
+
+        results = await player.node.get_tracks(query)
+
+        if not results or not results['tracks']:
+            return await ctx.send('Song not found :x: Please try again :mag_right:')
+
+        em = discord.Embed(colour=discord.Colour(0xFF69B4))
+
+        if results['loadType'] == 'PLAYLIST_LOADED':
+            tracks = results['tracks']
+
             for track in tracks:
-                i = i + 1
-                query_result = query_result + f'{i}) {track["info"]["title"]} - {track["info"]["uri"]}\n'
-            embed = Embed()
-            embed.description = query_result
+                # Add all of the tracks from the playlist to the queue.
+                player.add(requester=ctx.author.id, track=track)
 
-            await ctx.channel.send(embed=embed)
+            em.title = 'Playlist Enqueued!'
+            em.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} tracks'
+        else:
+            track = results['tracks'][0]
+            em.title = 'Track Enqueued'
+            em.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
+            em.set_thumbnail(url=f"http://i.ytimg.com/vi/{track['info']['identifier']}/hqdefault.jpg")
 
-            def check(m):
-                return m.author.id == ctx.author.id
-
-            response = await self.bot.wait_for('message', check=check)
-            track = tracks[int(response.content) - 1]
-
+            em.add_field(name='Channel', value=track['info']['author'])
+            if track['info']['isStream']:
+                duration = 'Live'
+            else:
+                duration = lavalink.format_time(track['info']['length']).lstrip('00:')
+            em.add_field(name='Duration', value=duration)
+            self.title = track["info"]["title"]
+            track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
             player.add(requester=ctx.author.id, track=track)
-            if not player.is_playing:
-                await player.play()
 
-        except Exception as error:
-            print(error)
+        if not player.is_playing:
+            await player.play()
+            await player.reset_equalizer()
+            # send nice msg
+            await ctx.send(embed=em)
+            # await self.now(ctx)
+            await self.bot.change_presence(
+                activity=discord.Activity(type=discord.ActivityType.listening, name=player.current.title))
+
+    @commands.command(name='queue', aliases=['q', 'playlist'])
+    async def queue(self, ctx, page: int = 1):
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+
+        if not player.queue:
+            return await ctx.send('Queue empty! Why not queue something? :cd:')
+
+        items_per_page = 10
+        pages = math.ceil(len(player.queue) / items_per_page)
+
+        start = (page - 1) * items_per_page
+        end = start + items_per_page
+
+        queue_list = ''
+
+        for i, track in enumerate(player.queue[start:end], start=start):
+            queue_list += f'`{i + 1}.` [**{track.title}**]({track.uri})\n'
+
+        embed = discord.Embed(colour=ctx.guild.me.top_role.colour,
+                              description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
+        embed.set_footer(text=f'Viewing page {page}/{pages}')
+        await ctx.send(embed=embed)
 
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
     async def skip(self, ctx):
@@ -55,6 +101,11 @@ class Music(commands.Cog):
 
         await ctx.send('⏭ | Skipped.')
         await player.skip()
+
+    @commands.command(name='text', help='text song')
+    async def text(self, ctx):
+        async with ctx.typing():
+            await ctx.send(await get_lyric(self.title))
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
