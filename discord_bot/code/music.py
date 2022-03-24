@@ -1,30 +1,20 @@
 import os
 # lavalink/server/info/AppInfo has been compiled by a more recent version of the Java Runtime (class file version 55.0),
 # this version of the Java Runtime only recognizes class file versions up to 52.0
+import discord
 from discord.ext import commands
 import lavalink
 from discord import utils
 from discord import Embed
 
 
-class MusicCog(commands.Cog):
+class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.music = lavalink.Client(self.bot.user.id)
         self.bot.music.add_node('localhost', 7000, 'testing', 'na', 'music-node')
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
-
-    @commands.command(name='join')
-    async def join(self, ctx):
-        print('join command worked')
-        member = utils.find(lambda m: m.id == ctx.author.id, ctx.guild.members)
-        if member is not None and member.voice is not None:
-            vc = member.voice.channel
-            player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-            if not player.is_connected:
-                player.store('channel', ctx.channel.id)
-                await self.connect_to(ctx.guild.id, str(vc.id))
 
     @commands.command(name='play')
     async def play(self, ctx, *, query):
@@ -56,6 +46,27 @@ class MusicCog(commands.Cog):
         except Exception as error:
             print(error)
 
+    @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
+    async def skip(self, ctx):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+
+        if not player.is_playing:
+            return await ctx.send('Not playing anything :mute:')
+
+        await ctx.send('⏭ | Skipped.')
+        await player.skip()
+
+    @play.before_invoke
+    async def ensure_voice(self, ctx):
+        print('join command worked')
+        member = utils.find(lambda m: m.id == ctx.author.id, ctx.guild.members)
+        if member is not None and member.voice is not None:
+            vc = member.voice.channel
+            player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
+            if not player.is_connected:
+                player.store('channel', ctx.channel.id)
+                await self.connect_to(ctx.guild.id, str(vc.id))
+
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.QueueEndEvent):
             guild_id = int(event.player.guild_id)
@@ -67,7 +78,4 @@ class MusicCog(commands.Cog):
 
 
 def setup(bot):
-    bot.add_cog(MusicCog(bot))
-
-
-
+    bot.add_cog(Music(bot))
