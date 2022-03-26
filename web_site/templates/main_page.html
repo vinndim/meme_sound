@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h2>♫MemeSound♫</h2>
-    <img src="https://wallpaperforu.com/wp-content/uploads/2021/01/lofi-wallpaper-210106233201412048x1152.jpg">
+<h2>♫MemeSound♫</h2>
+<body>
+     <div id="videoBC">
+        <video id="videoBG" poster="{{ url_for('static', filename='poster.jpg') }}" autoplay muted loop>
+            <source src="{{ url_for('static', filename='bk.mp4') }}" type="video/mp4">
+        </video>
+         <a type="button" class="btn btn-dark" href="/add_playlist">+ Добавить плейлист</a>
+    </div>
+    </body>
 {% endblock %}

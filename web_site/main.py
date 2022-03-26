@@ -3,7 +3,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from data import db_session
-from data.forms import LoginForm
+from data.forms import LoginForm, AddPlaylistForm
 from data.users import User
 from forms.user import RegisterForm
 
@@ -30,6 +30,14 @@ def main_page():
     return render_template('main_page.html')
 
 
+@app.route('/user_environment')
+def user_environment():
+    db_sess = db_session.create_session()
+    user = db_sess.query(User)
+    print(user)
+    return render_template('user_environment.html', user=user)
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
@@ -37,7 +45,7 @@ def login():
         db_sess = db_session.create_session()
         user = db_sess.query(User).filter(User.email == form.email.data).first()
         if user and user.check_password(form.password.data):
-            # login_user(user, remember=form.remember_me.data)
+            login_user(user, remember=form.remember_me.data)
             return redirect("/")
         return render_template('login.html',
                                message="Неправильный логин или пароль",
@@ -74,6 +82,26 @@ def reqister():
         db_sess.commit()
         return redirect('/login')
     return render_template('register.html', title='Регистрация', form=form)
+
+
+@app.route('/add_playlist')
+def add_playlist():
+    form = AddPlaylistForm
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        if db_sess.query(User).filter(User.email == form.email.data).first():
+            return render_template('add_playlist.html', title='Новый плейлист',
+                                   form=form,
+                                   message="Такой плейлист уже есть")
+        user = User(
+            name=form.name.data,
+            email=form.email.data,
+        )
+        user.set_password(form.password.data)
+        db_sess.add(user)
+        db_sess.commit()
+        return redirect('/login')
+    return render_template('add_playlist.html', title='Авторизация', form=form)
 
 
 if __name__ == '__main__':

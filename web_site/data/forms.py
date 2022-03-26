@@ -8,3 +8,8 @@ class LoginForm(FlaskForm):
     password = PasswordField('Пароль', validators=[DataRequired()])
     remember_me = BooleanField('Запомнить меня')
     submit = SubmitField('Войти')
+
+
+class AddPlaylistForm(FlaskForm):
+    name = StringField('Название', validators=[DataRequired()])
+    command = StringField('Команда', validators=[DataRequired()])
