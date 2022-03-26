@@ -10,6 +10,3 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Войти')
 
 
-class AddPlaylistForm(FlaskForm):
-    name = StringField('Название', validators=[DataRequired()])
-    command = StringField('Команда', validators=[DataRequired()])

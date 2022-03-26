@@ -3,9 +3,11 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from data import db_session
-from data.forms import LoginForm, AddPlaylistForm
+from data.forms import LoginForm
 from data.users import User
+from data.playlist import PlayList
 from forms.user import RegisterForm
+from forms.playlist import PlayListRegisterForm
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
@@ -33,8 +35,7 @@ def main_page():
 @app.route('/user_environment')
 def user_environment():
     db_sess = db_session.create_session()
-    user = db_sess.query(User)
-    print(user)
+    user = db_sess.query(User).all()
     return render_template('user_environment.html', user=user)
 
 
@@ -84,24 +85,17 @@ def reqister():
     return render_template('register.html', title='Регистрация', form=form)
 
 
-@app.route('/add_playlist')
+@app.route('/add_playlist', methods=['GET', 'POST'])
 def add_playlist():
-    form = AddPlaylistForm
+    form = PlayListRegisterForm()
     if form.validate_on_submit():
         db_sess = db_session.create_session()
-        if db_sess.query(User).filter(User.email == form.email.data).first():
-            return render_template('add_playlist.html', title='Новый плейлист',
-                                   form=form,
-                                   message="Такой плейлист уже есть")
-        user = User(
-            name=form.name.data,
-            email=form.email.data,
-        )
-        user.set_password(form.password.data)
-        db_sess.add(user)
+        user = db_sess.query(User).filter(User.id == 1).first()
+        playlist = PlayList(name=form.name.data, command=form.command.data, user_id=user)
+        user.playlist.append(playlist)
         db_sess.commit()
-        return redirect('/login')
-    return render_template('add_playlist.html', title='Авторизация', form=form)
+        return redirect('/')
+    return render_template('add_playlist.html', title='Новый плейлист', form=form)
 
 
 if __name__ == '__main__':
