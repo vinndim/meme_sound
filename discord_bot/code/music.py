@@ -1,3 +1,4 @@
+import math
 import os
 # lavalink/server/info/AppInfo has been compiled by a more recent version of the Java Runtime (class file version 55.0),
 # this version of the Java Runtime only recognizes class file versions up to 52.0
@@ -66,15 +67,13 @@ class Music(commands.Cog):
             # send nice msg
             await ctx.send(embed=em)
             # await self.now(ctx)
-            await self.bot.change_presence(
-                activity=discord.Activity(type=discord.ActivityType.listening, name=player.current.title))
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
-    async def queue(self, ctx, page: int = 1):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+    async def queue(self, ctx, page: int = 0):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
 
         if not player.queue:
-            return await ctx.send('Queue empty! Why not queue something? :cd:')
+            return await ctx.send('Нет песен :cd:')
 
         items_per_page = 10
         pages = math.ceil(len(player.queue) / items_per_page)
@@ -87,7 +86,7 @@ class Music(commands.Cog):
         for i, track in enumerate(player.queue[start:end], start=start):
             queue_list += f'`{i + 1}.` [**{track.title}**]({track.uri})\n'
 
-        embed = discord.Embed(colour=ctx.guild.me.top_role.colour,
+        embed = discord.Embed(colour=discord.Colour(0xFF69B4),
                               description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
         embed.set_footer(text=f'Viewing page {page}/{pages}')
         await ctx.send(embed=embed)
@@ -97,7 +96,7 @@ class Music(commands.Cog):
         player = self.bot.music.player_manager.get(ctx.guild.id)
 
         if not player.is_playing:
-            return await ctx.send('Not playing anything :mute:')
+            return await ctx.send('Ничего не играет и да... :mute:')
 
         await ctx.send('⏭ | Skipped.')
         await player.skip()
