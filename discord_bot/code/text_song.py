@@ -14,8 +14,6 @@ opts.add_argument("--headless")  # без графического интерф�
 # for linux:
 browser = Firefox(executable_path="../utils/geckodriver", options=opts)
 
-# # for windows:
-# browser = Firefox(executable_path="../discord_bot/geckodriver", options=opts)
 site_with_text = "genius"
 
 
@@ -41,6 +39,7 @@ async def get_lyric(song):
             soup = BeautifulSoup(requests.get(url).content, 'lxml')
             for tag in soup.select('div[class^="Lyrics__Container"], .song_body-lyrics p'):
                 text += tag.get_text(strip=True, separator='\n')
+            print(text)
             if len(text) <= 2000:
                 return text
             else:
