@@ -3,7 +3,7 @@ import yt_dlp
 
 from discord.ext import commands
 
-from config import TOKEN
+from web_site.config import TOKEN
 from yt_video import YTDLSource
 from text_song import get_lyric
 

@@ -2,7 +2,7 @@ import discord
 
 import asyncio
 
-from config import ytdl, FFMPEG_OPTIONS
+from web_site.config import ytdl, FFMPEG_OPTIONS
 
 
 class YTDLSource(discord.PCMVolumeTransformer):

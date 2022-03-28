@@ -7,7 +7,14 @@
         <video id="videoBG" poster="{{ url_for('static', filename='poster.jpg') }}" autoplay muted loop>
             <source src="{{ url_for('static', filename='СФ идет под фонк_Шадоу финд(тик ток).mp4') }}" type="video/mp4">
         </video>
+         {% if playlists %}
+            {% for playlist in playlists %}
+                <a type="button" class="btn btn-dark">{{playlist}}</a>
+            {% endfor %}
          <a type="button" class="btn btn-dark" href="/add_playlist">+ Добавить плейлист</a>
+         {% else %}
+            <a type="button" class="btn btn-dark" href="/add_playlist">+ Добавить плейлист</a>
+         {% endif %}
     </div>
     </body>
 {% endblock %}

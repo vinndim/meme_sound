@@ -13,9 +13,8 @@ class User(SqlAlchemyBase, UserMixin):
 
     id = sqlalchemy.Column(sqlalchemy.Integer,
                            primary_key=True, autoincrement=True)
-    email = sqlalchemy.Column(sqlalchemy.String, nullable=True)
-    hashed_password = sqlalchemy.Column(sqlalchemy.String, nullable=True)
-    name = sqlalchemy.Column(sqlalchemy.String, nullable=True)
+    name = sqlalchemy.Column(sqlalchemy.String, nullable=True, unique=True)
+    user_id = sqlalchemy.Column(sqlalchemy.Integer, unique=True)
     playlist = orm.relation("PlayList", back_populates='user')
 
     def set_password(self, password):

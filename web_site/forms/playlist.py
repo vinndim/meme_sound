@@ -1,9 +1,9 @@
 from flask_wtf import FlaskForm
-from wtforms import PasswordField, StringField, TextAreaField, SubmitField, EmailField
+from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired
 
 
 class PlayListRegisterForm(FlaskForm):
-    name = EmailField('Имя', validators=[DataRequired()])
-    command = PasswordField('Команда', validators=[DataRequired()])
+    name = StringField('Имя', validators=[DataRequired()])
+    command = StringField('Команда', validators=[DataRequired()])
     submit = SubmitField('Сохранить')
