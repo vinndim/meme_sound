@@ -2,7 +2,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-site_with_lyric = " genius"
+site_with_lyric = "genius"
 
 
 async def get_lyric(song):
