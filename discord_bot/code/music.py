@@ -1,11 +1,12 @@
 import math
 
+import aiohttp
 import discord
 from discord.ext import commands
 import lavalink
 from discord import utils
 
-from discord_bot.code.text_song import get_lyric
+from discord_bot.code.text_song import get_lyric, get_normal_title
 
 
 async def command_user(ctx, msg):
@@ -23,6 +24,7 @@ class Music(commands.Cog):
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
         self.title = ""
+        self.ctx = None
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
@@ -64,11 +66,10 @@ class Music(commands.Cog):
             self.title = track["info"]["title"]
             track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
             player.add(requester=ctx.author.id, track=track)
+            self.ctx = ctx
 
         if not player.is_playing:
             await player.play()
-            await player.reset_equalizer()
-            await self.now(ctx)
         else:
             await ctx.send(embed=em)
 
@@ -92,7 +93,7 @@ class Music(commands.Cog):
         for i, track in enumerate(player.queue[start:end], start=start):
             queue_list += f'`{i + 1}.` [**{track.title}**]({track.uri})\n'
 
-        embed = discord.Embed(colour=ctx.guild.me.top_role.colour,
+        embed = discord.Embed(colour=discord.Colour(0xFF69B4),
                               description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
         embed.set_footer(text=f'Viewing page {page}/{pages}')
         await ctx.send(embed=embed)
@@ -124,12 +125,11 @@ class Music(commands.Cog):
             em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
             em.set_author(name="Now Playing", icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
-            requester = ctx.guild.get_member(player.current.requester)
-            em.set_footer(text=f"Requested by: {requester}", icon_url=requester.avatar_url)
 
             await ctx.send(embed=em)
             await self.bot.change_presence(
-                activity=discord.Activity(type=discord.ActivityType.listening, name=player.current.title))
+                activity=discord.Activity(type=discord.ActivityType.listening,
+                                          name=await get_normal_title(player.current.title)))
         else:
             await ctx.send('Not playing anything :mute:')
 
@@ -197,6 +197,9 @@ class Music(commands.Cog):
         if isinstance(event, lavalink.events.QueueEndEvent):
             guild_id = int(event.player.guild_id)
             await self.connect_to(guild_id, None)
+        if isinstance(event, lavalink.events.TrackStartEvent):
+            print("TrackStartEvent")
+            await self.now(self.ctx)
 
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
