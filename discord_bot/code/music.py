@@ -68,7 +68,7 @@ class Music(commands.Cog):
         if not player.is_playing:
             await player.play()
             await player.reset_equalizer()
-            # await self.now(ctx)
+            await self.now(ctx)
         else:
             await ctx.send(embed=em)
 
@@ -100,7 +100,6 @@ class Music(commands.Cog):
     @commands.command(name='now', aliases=['np'])
     async def now(self, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
-        song = 'Nothing'
 
         if player.current:
             if player.current.stream:
@@ -123,7 +122,7 @@ class Music(commands.Cog):
             song = f'[{player.current.title}]({player.current.uri})\n`{pos} {bar} {dur}`'
 
             em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
-            em.set_author(name="Now Playing 🎵", icon_url="https://www.beta.wearequilt.com/?utm_source=twitter_giphy&utm_medium=social&utm_campaign=giphy")
+            em.set_author(name="Now Playing", icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
             requester = ctx.guild.get_member(player.current.requester)
             em.set_footer(text=f"Requested by: {requester}", icon_url=requester.avatar_url)
