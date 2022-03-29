@@ -2,19 +2,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
-from selenium.webdriver.common.by import By
-
-from selenium.webdriver import Firefox
-from selenium.webdriver.firefox.options import Options
-
-opts = Options()
-
-opts.add_argument("--headless")  # без графического интерфейса.
-
-# for linux:
-browser = Firefox(executable_path="../utils/geckodriver", options=opts)
-
-site_with_text = "genius"
+site_with_lyric = " genius"
 
 
 async def get_lyric(song):
@@ -24,26 +12,24 @@ async def get_lyric(song):
         search_song = search_song.split("(")[0] + search_song.split(")")[1]
     except IndexError:
         pass
-    print(search_song)
-    browser.get('https://yandex.ru/search/?text=' + search_song + site_with_text)
-    elems = browser.find_elements(by=By.XPATH, value="//a[@href]")
-    url = ''
+    r = requests.get('https://www.google.com/search?q=',
+                     params={'q': f'{search_song} {site_with_lyric}'})
+    soup = BeautifulSoup(r.content, 'html.parser')
+    url = ""
     text = ''
-    for elem in elems:
-        some_url = elem.get_attribute("href")
-        if some_url.startswith("https://genius.com/"):
-            url = some_url
+    for link in soup.find_all('a'):
+        if "https://genius.com/" in link.get('href'):
+            url = link.get('href').split("&")[0][7:]
             break
     if url:
         try:
             soup = BeautifulSoup(requests.get(url).content, 'lxml')
             for tag in soup.select('div[class^="Lyrics__Container"], .song_body-lyrics p'):
                 text += tag.get_text(strip=True, separator='\n')
-            print(text)
             if len(text) <= 2000:
-                return text
+                return [text]
             else:
-                return "Текст чет большой слишком"
+                return [text[:2000], text[2000:]]
         except Exception as e:
             print(e)
     return "**Не найдено на https://genius.com/**"

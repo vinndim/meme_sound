@@ -97,6 +97,43 @@ class Music(commands.Cog):
         embed.set_footer(text=f'Viewing page {page}/{pages}')
         await ctx.send(embed=embed)
 
+    @commands.command(name='now', aliases=['np'])
+    async def now(self, ctx):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+        song = 'Nothing'
+
+        if player.current:
+            if player.current.stream:
+                dur = 'LIVE'
+                pos = ''
+                count = total = 1
+            else:
+                count = player.position
+                pos = lavalink.format_time(count)
+                total = player.current.duration
+                dur = lavalink.format_time(total)
+                if pos == dur:  # When called immediatly after enqueue
+                    count = 0
+                    pos = '00:00:00'
+                dur = dur.lstrip('00:')
+                pos = pos[-len(dur):]
+            bar_len = 30  # bar length
+            filled_len = int(bar_len * count // float(total))
+            bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
+            song = f'[{player.current.title}]({player.current.uri})\n`{pos} {bar} {dur}`'
+
+            em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
+            em.set_author(name="Now Playing 🎵", icon_url="https://www.beta.wearequilt.com/?utm_source=twitter_giphy&utm_medium=social&utm_campaign=giphy")
+            em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
+            requester = ctx.guild.get_member(player.current.requester)
+            em.set_footer(text=f"Requested by: {requester}", icon_url=requester.avatar_url)
+
+            await ctx.send(embed=em)
+            await self.bot.change_presence(
+                activity=discord.Activity(type=discord.ActivityType.listening, name=player.current.title))
+        else:
+            await ctx.send('Not playing anything :mute:')
+
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
     async def skip(self, ctx):
         await ctx.message.delete()
@@ -142,8 +179,9 @@ class Music(commands.Cog):
     async def text(self, ctx):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
-        async with ctx.typing():
-            await ctx.send(await get_lyric(self.title))
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+        for msg in await get_lyric(player.current.title):
+            await ctx.send(msg)
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
