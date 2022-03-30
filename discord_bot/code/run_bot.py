@@ -14,9 +14,4 @@ async def on_ready():
     bot.load_extension('music')
 
 
-# @bot.event
-# async def on_message(message):
-#     print(message.content)
-
-
 bot.run(TOKEN)

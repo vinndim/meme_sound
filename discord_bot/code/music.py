@@ -1,6 +1,5 @@
 import math
 
-import aiohttp
 import discord
 from discord.ext import commands
 import lavalink
@@ -95,7 +94,7 @@ class Music(commands.Cog):
 
         embed = discord.Embed(colour=discord.Colour(0xFF69B4),
                               description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
-        embed.set_footer(text=f'Viewing page {page}/{pages}')
+        embed.set_footer(text=f'{page}/{pages}')
         await ctx.send(embed=embed)
 
     @commands.command(name='now', aliases=['np'])
@@ -120,10 +119,11 @@ class Music(commands.Cog):
             bar_len = 30  # bar length
             filled_len = int(bar_len * count // float(total))
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
-            song = f'[{player.current.title}]({player.current.uri})\n`{pos} {bar} {dur}`'
+            song = f'[{get_normal_title(player.current.title)}]({player.current.uri})\n`{pos} {bar} {dur}`'
 
             em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
-            em.set_author(name="Now Playing", icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
+            em.set_author(name="**Сейчас играет**",
+                          icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
 
             await ctx.send(embed=em)
@@ -131,7 +131,7 @@ class Music(commands.Cog):
                 activity=discord.Activity(type=discord.ActivityType.listening,
                                           name=await get_normal_title(player.current.title)))
         else:
-            await ctx.send('Not playing anything :mute:')
+            await ctx.send('Ничего не играет :mute:')
 
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
     async def skip(self, ctx):
@@ -142,21 +142,22 @@ class Music(commands.Cog):
         if not player.is_playing:
             return await ctx.send('Ничего не играет и да... :mute:')
 
-        await ctx.send('⏭ | Skipped.')
+        await ctx.send('⏭ | Пропущена.')
         await player.skip()
 
-    @commands.command(name='repeat')
+    @commands.command(name='repeat', aliases=["stop repeat"])
     async def repeat(self, ctx):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
 
         if not player.is_playing:
-            return await ctx.send('Not playing anything :mute:')
+            return await ctx.send('Ничего не играет :mute:')
 
+        # меняем флаг повтора
         player.repeat = not player.repeat
 
-        await ctx.send('🔁 | Repeat ' + ('enabled' if player.repeat else 'disabled'))
+        await ctx.send('🔁 |  Песни крутятся' + ('enabled' if player.repeat else 'disabled'))
 
     @commands.command(name='pause', aliases=['resume'], help='get song paused')
     async def pause(self, ctx):
@@ -165,14 +166,14 @@ class Music(commands.Cog):
         player = self.bot.music.player_manager.get(ctx.guild.id)
 
         if not player.is_playing:
-            return await ctx.send('Not playing anything :mute:')
+            return await ctx.send('Ничего не играет :mute:')
 
         if player.paused:
             await player.set_pause(False)
-            await ctx.send('▶ | Song resumed')
+            await ctx.send('▶ | Песня возобновлена')
         else:
             await player.set_pause(True)
-            await ctx.send('⏸ | Song paused')
+            await ctx.send('⏸ | Песня приостановлена')
 
     @commands.command(name='text', help='lyric')
     async def text(self, ctx):
@@ -192,6 +193,8 @@ class Music(commands.Cog):
             if not player.is_connected:
                 player.store('channel', ctx.channel.id)
                 await self.connect_to(ctx.guild.id, str(vc.id))
+        else:
+            await ctx.send("Зайди в голосовой канал")
 
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.QueueEndEvent):
@@ -204,6 +207,11 @@ class Music(commands.Cog):
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
+
+    @commands.command(name="help", aliases=['h'])
+    async def help(self, ctx):
+        em = discord.Embed(colour=discord.Colour(0xFF69B4))
+        em.set_author(name="**Список команд**")
 
 
 def setup(bot):
