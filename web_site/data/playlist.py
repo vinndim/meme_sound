@@ -14,10 +14,10 @@ class PlayList(SqlAlchemyBase, UserMixin):
     id = sqlalchemy.Column(sqlalchemy.Integer,
                            primary_key=True, autoincrement=True)
     name = sqlalchemy.Column(sqlalchemy.String, nullable=True)
-    command = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     user_id = sqlalchemy.Column(sqlalchemy.Integer,
                                 sqlalchemy.ForeignKey("users.id"))
     user = orm.relation('User')
+    songs = orm.relation("Songs", back_populates='playlist')
 
     def __repr__(self):
-        return f'<User> {self.name} {self.command}'
+        return self.name

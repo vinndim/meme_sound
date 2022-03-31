@@ -1,3 +1,5 @@
+import requests
+from bs4 import BeautifulSoup
 from flask import Flask, render_template, request, session
 from flask_login import LoginManager
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +11,8 @@ from data.playlist import PlayList
 from data.config import OAUTH_URL, REDIRECT_URL
 from web_site.config import TOKEN, CLIENT_SECRET
 from forms.playlist import PlayListRegisterForm
+from forms.add_songs import AddSongForm
+from data.songs import Songs
 from zenora import APIClient
 
 app = Flask(__name__)
@@ -17,6 +21,13 @@ client = APIClient(TOKEN, client_secret=CLIENT_SECRET)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
+
+
+def get_title(url):
+    r = requests.get(url)
+    soup = BeautifulSoup(r.content, 'html.parser')
+    title = list(soup.stripped_strings)[0]
+    return title.rstrip(" - YouTube")
 
 
 def main():
@@ -36,7 +47,6 @@ def main_page():
         bearer_client = APIClient(session.get('token'), bearer=True)
         current_user = bearer_client.users.get_current_user()
         db_sess = db_session.create_session()
-        user = db_sess.query(User).filter(User.id == 1).first()
         playlists = db_sess.query(PlayList).filter(PlayList.user_id == User.id, User.user_id == current_user.id)
         return render_template('main_page.html', current_user=current_user, playlists=playlists)
     return render_template('main_page.html', oauth_url=OAUTH_URL, current_user=None)
@@ -73,12 +83,28 @@ def add_playlist():
     if form.validate_on_submit():
         db_sess = db_session.create_session()
         user = db_sess.query(User).filter(User.id == 1).first()
-        playlist = PlayList(name=form.name.data, command=form.command.data, user_id=user)
+        playlist = PlayList(name=form.name.data, user_id=user)
         playlists = db_sess.query(PlayList).filter(PlayList.user_id == User.id, User.user_id == current_user.id)
         user.playlist.append(playlist)
         db_sess.commit()
         return render_template('main_page.html', playlists=playlists, current_user=current_user)
     return render_template('add_playlist.html', title='Новый плейлист', form=form, current_user=current_user)
+
+
+@app.route('/add_songs/<playlist>', methods=['GET', 'POST'])
+def add_songs(playlist):
+    form = AddSongForm()
+    bearer_client = APIClient(session.get('token'), bearer=True)
+    current_user = bearer_client.users.get_current_user()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        playlist = db_sess.query(PlayList).filter(PlayList.name == playlist).first()
+        name = get_title(form.url.data)
+        song = Songs(name=form.url.data, playlist_id=playlist.id)
+        db_sess.add(song)
+        db_sess.commit()
+        return redirect("/")
+    return render_template('add_song.html', form=form, current_user=current_user, playlist=playlist)
 
 
 if __name__ == '__main__':
