@@ -1,12 +1,11 @@
+import asyncio
 import math
 import os
-
 import discord
 from discord.ext import commands
 import lavalink
 from discord import utils
-import sqlite3
-
+import aiosqlite
 from discord_bot.code.text_song import get_lyric, get_normal_title
 
 
@@ -24,83 +23,78 @@ class Music(commands.Cog):
         self.bot.music.add_node('localhost', 7000, 'testing', 'ru', 'music-node')
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
+        self.db_path = os.path.abspath('../..') + "/web_site/db/users.db"
         self.ctx = None
-        self.cur = sqlite3.connect(os.path.abspath('../..') + "/web_site/db")
 
-    @commands.command(name="playlist")
+    @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
-        id_user = ctx.message.author.id
-        # self.cur.execute('''SELECT name FROM songs
-        # WHERE playlist_id = (SELECT id, user_id FROM playlist WHERE name=?,
-        # user_id=(SELECT id FROM users WHERE user_id = ?))''')
+        user_id = ctx.message.author.id
+        db = await aiosqlite.connect(self.db_path)
+        cursor = await db.execute('''SELECT name FROM songs 
+        WHERE playlist_id = (SELECT id FROM playlist WHERE (name=? AND 
+        user_id=(SELECT id FROM users WHERE user_id = ?)))''', [playlist_name, user_id])
+        tracks = await cursor.fetchall()
+        await cursor.close()
+        await db.close()
+        if tracks:
+            for query in tracks:
+                await self.add_song_to_player(query[0], ctx)
+        else:
+            await ctx.send("Плейлист не найден :cry:")
 
-    @commands.command(name='play', aliases=['p', 'sing', '100-7'])
-    async def play(self, ctx, *, query):
+    async def add_song_to_player(self, query, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
-
-        query = query.strip('<>')
-
-        if not query.startswith('http'):
-            query = f'ytsearch:{query}'
-
         results = await player.node.get_tracks(query)
-
         if not results or not results['tracks']:
             return await ctx.send('Song not found :x: Please try again :mag_right:')
-
         em = discord.Embed(colour=discord.Colour(0xFF69B4))
-
         if results['loadType'] == 'PLAYLIST_LOADED':
             tracks = results['tracks']
-
             for track in tracks:
                 # Add all of the tracks from the playlist to the queue.
                 player.add(requester=ctx.author.id, track=track)
-
             em.title = 'Playlist Enqueued!'
             em.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} tracks'
         else:
             track = results['tracks'][0]
             em.title = 'Track Enqueued'
-            em.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
+            em.description = f'{track["info"]["title"]}'
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{track['info']['identifier']}/hqdefault.jpg")
-
             em.add_field(name='Channel', value=track['info']['author'])
             if track['info']['isStream']:
                 duration = 'Live'
             else:
                 duration = lavalink.format_time(track['info']['length']).lstrip('00:')
             em.add_field(name='Duration', value=duration)
-            self.title = track["info"]["title"]
             track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
             player.add(requester=ctx.author.id, track=track)
             self.ctx = ctx
-
         if not player.is_playing:
             await player.play()
         else:
             await ctx.send(embed=em)
+
+    @commands.command(name='play', aliases=['p', 'sing', '100-7'])
+    async def play(self, ctx, *, query):
+        query = query.strip('<>')
+        if not query.startswith('http'):
+            query = f'ytsearch:{query}'
+        await self.add_song_to_player(query, ctx)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
-
         if not player.queue:
-            return await ctx.send('Queue empty! Why not queue something? :cd:')
-
+            return await ctx.send('Ничего не добавлено :cd:')
         items_per_page = 10
         pages = math.ceil(len(player.queue) / items_per_page)
-
         start = (page - 1) * items_per_page
         end = start + items_per_page
-
         queue_list = ''
-
         for i, track in enumerate(player.queue[start:end], start=start):
-            queue_list += f'`{i + 1}.` [**{track.title}**]({track.uri})\n'
-
+            queue_list += f'`{i + 1}.` **{track.title}**\n'
         embed = discord.Embed(colour=discord.Colour(0xFF69B4),
                               description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
         embed.set_footer(text=f'{page}/{pages}')
@@ -109,7 +103,6 @@ class Music(commands.Cog):
     @commands.command(name='now', aliases=['np'])
     async def now(self, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
-
         if player.current:
             if player.current.stream:
                 dur = 'LIVE'
@@ -128,13 +121,11 @@ class Music(commands.Cog):
             bar_len = 30  # bar length
             filled_len = int(bar_len * count // float(total))
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
-            song = f'[{await get_normal_title(player.current.title)}]({player.current.uri})\n`{pos} {bar} {dur}`'
-
+            song = f'{await get_normal_title(player.current.title)}\n`{pos} {bar} {dur}`'
             em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
             em.set_author(name="Сейчас играет",
                           icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
-
             await ctx.send(embed=em)
             await self.bot.change_presence(
                 activity=discord.Activity(type=discord.ActivityType.listening,
@@ -149,10 +140,8 @@ class Music(commands.Cog):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
-
         if not player.is_playing:
             return await ctx.send('Ничего не играет и да... :mute:')
-
         await ctx.send('⏭ | Пропущена.')
         await player.skip()
 
@@ -161,13 +150,10 @@ class Music(commands.Cog):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
-
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
-
         # меняем флаг повтора
         player.repeat = not player.repeat
-
         await ctx.send('🔁 | ' + ('Песни крутятся' if player.repeat else 'Песни не крутятся'))
 
     @commands.command(name='pause', aliases=['resume'], help='get song paused')
@@ -175,10 +161,8 @@ class Music(commands.Cog):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
-
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
-
         if player.paused:
             await player.set_pause(False)
             await ctx.send('▶ | Песня возобновлена')
@@ -189,17 +173,13 @@ class Music(commands.Cog):
     @commands.command(name='remove', aliases=['pop'])
     async def remove(self, ctx, index: int):
         player = self.bot.music.player_manager.get(ctx.guild.id)
-
         if not player.queue:
             return await ctx.send('Nothing queued :cd:')
-
         if index > len(player.queue) or index < 1:
             return await ctx.send('Index has to be >=1 and <=queue size')
-
         index = index - 1
         removed = player.queue.pop(index)
-
-        await ctx.send('Removed **' + removed.title + '** from the queue.')
+        await ctx.send('Removed ' + removed.title + ' from the queue.')
 
     @commands.command(name='text', help='lyric')
     async def text(self, ctx):
