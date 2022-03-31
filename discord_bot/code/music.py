@@ -1,9 +1,11 @@
 import math
+import os
 
 import discord
 from discord.ext import commands
 import lavalink
 from discord import utils
+import sqlite3
 
 from discord_bot.code.text_song import get_lyric, get_normal_title
 
@@ -22,8 +24,15 @@ class Music(commands.Cog):
         self.bot.music.add_node('localhost', 7000, 'testing', 'ru', 'music-node')
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
-        self.title = ""
         self.ctx = None
+        self.cur = sqlite3.connect(os.path.abspath('../..') + "/web_site/db")
+
+    @commands.command(name="playlist")
+    async def user_playlist(self, ctx, *, playlist_name):
+        id_user = ctx.message.author.id
+        # self.cur.execute('''SELECT name FROM songs
+        # WHERE playlist_id = (SELECT id, user_id FROM playlist WHERE name=?,
+        # user_id=(SELECT id FROM users WHERE user_id = ?))''')
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
@@ -119,10 +128,10 @@ class Music(commands.Cog):
             bar_len = 30  # bar length
             filled_len = int(bar_len * count // float(total))
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
-            song = f'[{get_normal_title(player.current.title)}]({player.current.uri})\n`{pos} {bar} {dur}`'
+            song = f'[{await get_normal_title(player.current.title)}]({player.current.uri})\n`{pos} {bar} {dur}`'
 
             em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
-            em.set_author(name="**Сейчас играет**",
+            em.set_author(name="Сейчас играет",
                           icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
 
@@ -131,7 +140,9 @@ class Music(commands.Cog):
                 activity=discord.Activity(type=discord.ActivityType.listening,
                                           name=await get_normal_title(player.current.title)))
         else:
-            await ctx.send('Ничего не играет :mute:')
+            member = utils.find(lambda m: m.id == ctx.author.id, ctx.guild.members)
+            if member is not None and member.voice is not None:
+                await ctx.send('Ничего не играет :mute:')
 
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
     async def skip(self, ctx):
@@ -157,7 +168,7 @@ class Music(commands.Cog):
         # меняем флаг повтора
         player.repeat = not player.repeat
 
-        await ctx.send('🔁 |  Песни крутятся' + ('enabled' if player.repeat else 'disabled'))
+        await ctx.send('🔁 | ' + ('Песни крутятся' if player.repeat else 'Песни не крутятся'))
 
     @commands.command(name='pause', aliases=['resume'], help='get song paused')
     async def pause(self, ctx):
@@ -174,6 +185,21 @@ class Music(commands.Cog):
         else:
             await player.set_pause(True)
             await ctx.send('⏸ | Песня приостановлена')
+
+    @commands.command(name='remove', aliases=['pop'])
+    async def remove(self, ctx, index: int):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+
+        if not player.queue:
+            return await ctx.send('Nothing queued :cd:')
+
+        if index > len(player.queue) or index < 1:
+            return await ctx.send('Index has to be >=1 and <=queue size')
+
+        index = index - 1
+        removed = player.queue.pop(index)
+
+        await ctx.send('Removed **' + removed.title + '** from the queue.')
 
     @commands.command(name='text', help='lyric')
     async def text(self, ctx):
@@ -203,15 +229,12 @@ class Music(commands.Cog):
         if isinstance(event, lavalink.events.TrackStartEvent):
             print("TrackStartEvent")
             await self.now(self.ctx)
+        if isinstance(event, lavalink.events.TrackEndEvent):
+            print("TrackEndEvent")
 
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
-
-    @commands.command(name="help", aliases=['h'])
-    async def help(self, ctx):
-        em = discord.Embed(colour=discord.Colour(0xFF69B4))
-        em.set_author(name="**Список команд**")
 
 
 def setup(bot):
