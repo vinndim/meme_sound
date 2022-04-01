@@ -36,7 +36,7 @@ async def parser_lyric(url):
 
 
 async def get_lyric(song):
-    search_song = get_normal_title(song)
+    search_song = await get_normal_title(song)
     r = requests.get('https://www.google.com/search?q=',
                      params={'q': f'{search_song} {site_with_lyric}'})
     soup = BeautifulSoup(r.content, 'html.parser')
@@ -46,7 +46,9 @@ async def get_lyric(song):
             url = link.get('href').split("&")[0][7:]
             break
     if url and "albums" not in url:
-        return await parser_lyric(url)
+        return parser_lyric(url)
     elif "albums" in url:
         return [""]
     return ["**Не найдено на https://genius.com/**"]
+
+
