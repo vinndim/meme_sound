@@ -20,7 +20,7 @@ class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.bot.music = lavalink.Client(self.bot.user.id)
-        self.bot.music.add_node('localhost', 7000, 'testing', 'ru', 'music-node')
+        self.bot.music.add_node('localhost', 7000, 'testing', 'in', 'music-node')
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
         self.db_path = os.path.abspath('../..') + "/web_site/db/users.db"
@@ -52,7 +52,6 @@ class Music(commands.Cog):
         if results['loadType'] == 'PLAYLIST_LOADED':
             tracks = results['tracks']
             for track in tracks:
-                # Add all of the tracks from the playlist to the queue.
                 player.add(requester=ctx.author.id, track=track)
             em.title = 'Playlist Enqueued!'
             em.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} tracks'
@@ -73,12 +72,15 @@ class Music(commands.Cog):
         if not player.is_playing:
             await player.play()
         else:
-            await ctx.send(embed=em)
+            msg = await ctx.send(embed=em)
+            await msg.delete(delay=5)
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
         query = query.strip('<>')
         if not query.startswith('http'):
+            await ctx.message.delete()
+            await command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
 
@@ -127,9 +129,7 @@ class Music(commands.Cog):
             em.set_author(name="Сейчас играет",
                           icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
-            if self.msg_now:
-                await self.msg_now.delete()
-            self.msg_now = await ctx.send(embed=em)
+            self.msg_now = await ctx.send(embed=em, delete_after=10)
             await self.bot.change_presence(
                 activity=discord.Activity(type=discord.ActivityType.listening,
                                           name=await get_normal_title(player.current.title)))
@@ -192,18 +192,39 @@ class Music(commands.Cog):
         for msg in await get_lyric(player.current.title):
             await ctx.send(msg)
 
-    @play.before_invoke
+    async def cog_before_invoke(self, ctx):
+        """ Command before-invoke handler. """
+        guild_check = ctx.guild is not None
+
+        if guild_check:
+            await self.ensure_voice(ctx)
+            #  Ensure that the bot and command author share a mutual voicechannel.
+
+        return guild_check
+
     async def ensure_voice(self, ctx):
-        print('join command worked')
-        member = utils.find(lambda m: m.id == ctx.author.id, ctx.guild.members)
-        if member is not None and member.voice is not None:
-            vc = member.voice.channel
-            player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-            if not player.is_connected:
-                player.store('channel', ctx.channel.id)
-                await self.connect_to(ctx.guild.id, str(vc.id))
+        """ This check ensures that the bot and command author are in the same voicechannel. """
+        player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
+        should_connect = ctx.command.name in ('play',)
+
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            raise commands.CommandInvokeError('Join a voice channel first :loud_sound:')
+
+        if not player.is_connected:
+            if not should_connect:
+                raise commands.CommandInvokeError('Not connected :mute:')
+
+            permissions = ctx.author.voice.channel.permissions_for(ctx.me)
+
+            if not permissions.connect or not permissions.speak:  # Check user limit too?
+                raise commands.CommandInvokeError(
+                    'I need the `CONNECT` and `SPEAK` permissions. :disappointed_relieved:')
+
+            player.store('channel', ctx.channel.id)
+            await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
         else:
-            await ctx.send("Зайди в голосовой канал")
+            if int(player.channel_id) != ctx.author.voice.channel.id:
+                raise commands.CommandInvokeError('You need to be in my voice channel :loud_sound:')
 
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.QueueEndEvent):
@@ -212,12 +233,15 @@ class Music(commands.Cog):
         if isinstance(event, lavalink.events.TrackStartEvent):
             print("TrackStartEvent")
             await self.now(self.ctx)
-        if isinstance(event, lavalink.events.TrackEndEvent):
-            print("TrackEndEvent")
+        print(event)
 
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
+
+    def cog_unload(self):
+        """ Cog unload handler. This removes any event hooks that were registered. """
+        self.bot.music._event_hooks.clear()
 
 
 def setup(bot):
