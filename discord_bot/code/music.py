@@ -104,8 +104,11 @@ class Music(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name='now', aliases=['np'])
-    async def now(self, ctx):
+    async def now(self, ctx, user=True):
         player = self.bot.music.player_manager.get(ctx.guild.id)
+        if user:
+            await ctx.message.delete()
+            await command_user(ctx, ctx.message.content)
         if player.current:
             if player.current.stream:
                 dur = 'LIVE'
@@ -232,7 +235,7 @@ class Music(commands.Cog):
             await self.connect_to(guild_id, None)
         if isinstance(event, lavalink.events.TrackStartEvent):
             print("TrackStartEvent")
-            await self.now(self.ctx)
+            await self.now(self.ctx, False)
         print(event)
 
     async def connect_to(self, guild_id: int, channel_id: str):
