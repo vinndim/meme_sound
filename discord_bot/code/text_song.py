@@ -46,9 +46,9 @@ async def get_lyric(song):
             url = link.get('href').split("&")[0][7:]
             break
     if url and "albums" not in url:
-        return parser_lyric(url)
+        return await parser_lyric(url)
     elif "albums" in url:
-        return [""]
+        return ["it's album"]
     return ["**Не найдено на https://genius.com/**"]
 
 

@@ -1,4 +1,3 @@
-import yt_dlp
 from dotenv import load_dotenv
 import os
 

@@ -6,7 +6,7 @@ from discord.ext import commands
 import lavalink
 from discord import utils
 import aiosqlite
-from discord_bot.code.text_song import get_lyric, get_normal_title
+from text_song import get_lyric, get_normal_title
 
 
 async def command_user(ctx, msg):
@@ -25,6 +25,7 @@ class Music(commands.Cog):
         self.bot.music.add_event_hook(self.track_hook)
         self.db_path = os.path.abspath('../..') + "/web_site/db/users.db"
         self.ctx = None
+        self.msg_now = None
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
@@ -126,7 +127,9 @@ class Music(commands.Cog):
             em.set_author(name="Сейчас играет",
                           icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
-            await ctx.send(embed=em)
+            if self.msg_now:
+                await self.msg_now.delete()
+            self.msg_now = await ctx.send(embed=em)
             await self.bot.change_presence(
                 activity=discord.Activity(type=discord.ActivityType.listening,
                                           name=await get_normal_title(player.current.title)))
