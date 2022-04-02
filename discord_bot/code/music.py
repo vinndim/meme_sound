@@ -1,18 +1,12 @@
 import math
 import os
 import discord
+from discord_components import DiscordComponents, SelectOption, Select, ButtonStyle, Button
 from discord.ext import commands
 import lavalink
 from discord import utils
 import aiosqlite
 from text_song import get_lyric, get_normal_title
-
-
-async def command_user(ctx, msg):
-    em = discord.Embed(colour=ctx.message.author.color, title=f"Command by "
-                                                              f"{ctx.message.author.display_name}  |  "
-                                                              f"<{msg}>")
-    await ctx.send(embed=em)
 
 
 class Music(commands.Cog):
@@ -25,6 +19,22 @@ class Music(commands.Cog):
         self.db_path = os.path.abspath('../..') + "/web_site/db/users.db"
         self.ctx = None
         self.msg_now = None
+
+    async def command_user(self, ctx, msg):
+        em = discord.Embed(colour=ctx.message.author.color, title=f"Command by "
+                                                                  f"{ctx.message.author.display_name}  |  "
+                                                                  f"<{msg}>")
+        await ctx.send(embed=em)
+
+    @commands.command(name="menu")
+    async def menu(self, ctx):
+        await ctx.message.delete()
+        await self.command_user(ctx, ctx.message.content)
+        await ctx.send(components=[Button(custom_id="button_repeat", emoji="🔄")])
+        command = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_repeat")
+        await command.send("repeat")
+        if command:
+            await self.repeat(ctx, True)
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
@@ -79,14 +89,14 @@ class Music(commands.Cog):
         query = query.strip('<>')
         if not query.startswith('http'):
             await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
+            await self.command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
         await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
+        await self.command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Ничего не добавлено :cd:')
@@ -107,7 +117,7 @@ class Music(commands.Cog):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if user:
             await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
+            await self.command_user(ctx, ctx.message.content)
         if player.current:
             if player.current.stream:
                 dur = 'LIVE'
@@ -143,7 +153,7 @@ class Music(commands.Cog):
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
     async def skip(self, ctx):
         await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
+        await self.command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет и да... :mute:')
@@ -151,9 +161,10 @@ class Music(commands.Cog):
         await player.skip()
 
     @commands.command(name='repeat', aliases=["stop repeat"])
-    async def repeat(self, ctx):
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
+    async def repeat(self, ctx, menu=False):
+        if not menu:
+            await ctx.message.delete()
+            await self.command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
@@ -164,7 +175,7 @@ class Music(commands.Cog):
     @commands.command(name='pause', aliases=['resume'], help='get song paused')
     async def pause(self, ctx):
         await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
+        await self.command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
@@ -177,6 +188,8 @@ class Music(commands.Cog):
 
     @commands.command(name='remove', aliases=['pop'])
     async def remove(self, ctx, index: int):
+        await ctx.message.delete()
+        await self.command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Nothing queued :cd:')
@@ -189,7 +202,7 @@ class Music(commands.Cog):
     @commands.command(name='text', help='lyric')
     async def text(self, ctx):
         await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
+        await self.command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         for msg in await get_lyric(player.current.title):
             await ctx.send(msg)
@@ -234,8 +247,17 @@ class Music(commands.Cog):
             await self.connect_to(guild_id, None)
         if isinstance(event, lavalink.events.TrackStartEvent):
             print("TrackStartEvent")
-            await self.now(self.ctx, False)
-        print(event)
+            ctx = event.player.fetch('channel')
+            if ctx:
+                ctx = self.bot.get_channel(ctx)
+                if ctx:
+                    em = discord.Embed(colour=discord.Colour(0xFF69B4))
+                    em.set_author(name=await get_normal_title(event.player.current.title),
+                                  icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
+                    await self.bot.change_presence(
+                        activity=discord.Activity(type=discord.ActivityType.listening,
+                                                  name=await get_normal_title(event.player.current.title)))
+                    await ctx.send(embed=em, delete_after=5)
 
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
