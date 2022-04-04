@@ -28,21 +28,24 @@ class Music(commands.Cog):
         self.msg_now = None
 
     @commands.command(name="menu")
-    async def menu(self, ctx):
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
-        btns = await ctx.send(components=[Button(emoji="🔄"),
-                                          Button(emoji="⏭"),
-                                          Button(emoji="▶"),
+    async def menu(self, ctx, again=False):
+        if not again:
+            await ctx.message.delete()
+            await command_user(ctx, ctx.message.content)
+        btns = await ctx.send(components=[Button(label="Повторить", emoji="🔄"),
+                                          Button(label="Следующий", emoji="⏭"),
+                                          Button(label="Остановить", emoji="▶"),
                                           ])
         responce = await self.bot.wait_for("button_click")
         if responce.channel == ctx.channel:
-            if responce.component.emoji == "🔄":
+            if responce.component.label == "Повторить":
                 await self.repeat(ctx, True)
-            if responce.component.emoji == "⏭":
+            if responce.component.label == "Следующий":
                 await self.skip(ctx, True)
-            if responce.component.emoji == "▶":
+            if responce.component.label == "Остановить":
                 await self.pause(ctx, True)
+            await btns.delete()
+            await self.menu(ctx, True)
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
@@ -246,6 +249,7 @@ class Music(commands.Cog):
                     'I need the `CONNECT` and `SPEAK` permissions. :disappointed_relieved:')
 
             player.store('channel', ctx.channel.id)
+            player.clear()
             await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
         else:
             if int(player.channel_id) != ctx.author.voice.channel.id:
@@ -261,8 +265,9 @@ class Music(commands.Cog):
             if ctx:
                 ctx = self.bot.get_channel(ctx)
                 if ctx:
-                    em = discord.Embed(colour=discord.Colour(0xFF69B4))
-                    em.set_author(name=await get_normal_title(event.player.current.title),
+                    em = discord.Embed(colour=discord.Colour(0xFF69B4),
+                                       description=await get_normal_title(event.player.current.title))
+                    em.set_author(name="Сейчас играет",
                                   icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
                     await self.bot.change_presence(
                         activity=discord.Activity(type=discord.ActivityType.listening,
