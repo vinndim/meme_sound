@@ -114,7 +114,7 @@ def add_songs(playlist):
         playlist.playlist_length = str((datetime.combine(date.today(), time_) + timedelta(seconds=video_length)).time())
         if video_length >= 3600:
             song = Songs(name=form.url.data, name_video=get_title(form.url.data),
-                         video_length=timedelta(seconds=video_length), playlist_id=playlist.id)
+                         video_length=str(timedelta(seconds=video_length)), playlist_id=playlist.id)
             db_sess.add(song)
             db_sess.commit()
         else:
