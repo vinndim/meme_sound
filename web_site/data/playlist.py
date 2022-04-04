@@ -16,6 +16,7 @@ class PlayList(SqlAlchemyBase, UserMixin):
     name = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     user_id = sqlalchemy.Column(sqlalchemy.Integer,
                                 sqlalchemy.ForeignKey("users.id"))
+    playlist_length = sqlalchemy.Column(sqlalchemy.String, default='0:00:00', nullable=False)
     user = orm.relation('User')
     songs = orm.relation("Songs", back_populates='playlist')
 

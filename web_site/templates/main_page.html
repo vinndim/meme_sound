@@ -1,15 +1,84 @@
 {% extends "base.html" %}
 
 {% block content %}
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.accordion {
+  background-color: #ffffff;
+  color: #444;
+  cursor: pointer;
+  padding: 18px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 15px;
+  transition: 0.4s;
+}
 
+.active, .accordion:hover {
+  background-color: #ffc0cb;
+}
+
+.accordion:after {
+  content: '\002B';
+  color: #777;
+  font-weight: bold;
+  float: right;
+  margin-left: 5px;
+}
+
+.active:after {
+  content: "\2212";
+}
+
+.panel {
+  padding: 0 18px;
+  background-color: white;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease-out;
+}
+</style>
+</head>
 <body>
+    {% if current_user %}
          {% if playlists %}
+            <h1>Записи в блоге</h1>
             {% for playlist in playlists %}
-                <a type="button" class="btn btn-dark" style="text-color: white; min-width: 100px" href="/add_songs/{{playlist}}">{{playlist}}</a>
+                <button class="accordion"><a href="/delete_playlist/{{ playlist.id }}" class="btn btn-danger">Удалить</a>{{playlist.name}} {{playlist.playlist_length}}<a type="button" class="btn btn-outline-primary btn-sm" style="text-color: white; min-width: 100px" href="/add_songs/{{playlist}}">Добавить песню в {{playlist}}</a></button>
+                <div class="panel">
+                    {% for song in songs %}
+                        <p>
+                            {% if song.playlist_id == playlist.id %}
+                                {{song.name_video}} {{song.video_length}} <a href="/delete_songs/{{ song.id }}" class="btn btn-danger">Удалить</a>
+                            {% endif %}
+                        </p>
+                    {% endfor %}
+                </div>
             {% endfor %}
          <a type="button" class="btn btn-dark" href="/add_playlist">+ Добавить плейлист</a>
          {% else %}
             <a type="button" class="btn btn-dark" href="/add_playlist">+ Добавить плейлист</a>
          {% endif %}
+    {% endif %}
+
+<script>
+var acc = document.getElementsByClassName("accordion");
+var i;
+
+for (i = 0; i < acc.length; i++) {
+  acc[i].addEventListener("click", function() {
+    this.classList.toggle("active");
+    var panel = this.nextElementSibling;
+    if (panel.style.maxHeight) {
+      panel.style.maxHeight = null;
+    } else {
+      panel.style.maxHeight = panel.scrollHeight + "px";
+    }
+  });
+}
+</script>
 </body>
 {% endblock %}
