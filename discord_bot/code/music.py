@@ -31,22 +31,18 @@ class Music(commands.Cog):
     async def menu(self, ctx):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
-        btns = await ctx.send(components=[Button(custom_id="button_repeat", emoji="🔄"),
-                                          Button(custom_id="button_skip", emoji="⏭"),
-                                          Button(custom_id="button_resume", emoji="▶"),
-                                          Button(custom_id="button_pause", emoji="⏸")])
-        command_repeat = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_repeat")
-        command_skip = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_skip")
-        command_resume = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_resume")
-        command_pause = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_pause")
-        if command_repeat:
-            await self.repeat(ctx, True)
-        if command_skip:
-            await self.skip(ctx, True)
-        if command_resume:
-            await self.pause(ctx, True)
-        if command_pause:
-            await self.pause(ctx, True)
+        btns = await ctx.send(components=[Button(emoji="🔄"),
+                                          Button(emoji="⏭"),
+                                          Button(emoji="▶"),
+                                          ])
+        responce = await self.bot.wait_for("button_click")
+        if responce.channel == ctx.channel:
+            if responce.component.emoji == "🔄":
+                await self.repeat(ctx, True)
+            if responce.component.emoji == "⏭":
+                await self.skip(ctx, True)
+            if responce.component.emoji == "▶":
+                await self.pause(ctx, True)
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
