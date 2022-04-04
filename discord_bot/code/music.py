@@ -9,6 +9,13 @@ import aiosqlite
 from text_song import get_lyric, get_normal_title
 
 
+async def command_user(ctx, msg):
+    em = discord.Embed(colour=ctx.message.author.color, title=f"Command by "
+                                                              f"{ctx.message.author.display_name}  |  "
+                                                              f"<{msg}>")
+    await ctx.send(embed=em)
+
+
 class Music(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -20,21 +27,26 @@ class Music(commands.Cog):
         self.ctx = None
         self.msg_now = None
 
-    async def command_user(self, ctx, msg):
-        em = discord.Embed(colour=ctx.message.author.color, title=f"Command by "
-                                                                  f"{ctx.message.author.display_name}  |  "
-                                                                  f"<{msg}>")
-        await ctx.send(embed=em)
-
     @commands.command(name="menu")
     async def menu(self, ctx):
         await ctx.message.delete()
-        await self.command_user(ctx, ctx.message.content)
-        await ctx.send(components=[Button(custom_id="button_repeat", emoji="🔄")])
-        command = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_repeat")
-        await command.send("repeat")
-        if command:
+        await command_user(ctx, ctx.message.content)
+        btns = await ctx.send(components=[Button(custom_id="button_repeat", emoji="🔄"),
+                                          Button(custom_id="button_skip", emoji="⏭"),
+                                          Button(custom_id="button_resume", emoji="▶"),
+                                          Button(custom_id="button_pause", emoji="⏸")])
+        command_repeat = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_repeat")
+        command_skip = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_skip")
+        command_resume = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_resume")
+        command_pause = await self.bot.wait_for("button_click", check=lambda i: i.custom_id == "button_pause")
+        if command_repeat:
             await self.repeat(ctx, True)
+        if command_skip:
+            await self.skip(ctx, True)
+        if command_resume:
+            await self.pause(ctx, True)
+        if command_pause:
+            await self.pause(ctx, True)
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
@@ -89,14 +101,14 @@ class Music(commands.Cog):
         query = query.strip('<>')
         if not query.startswith('http'):
             await ctx.message.delete()
-            await self.command_user(ctx, ctx.message.content)
+            await command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
         await ctx.message.delete()
-        await self.command_user(ctx, ctx.message.content)
+        await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Ничего не добавлено :cd:')
@@ -117,7 +129,7 @@ class Music(commands.Cog):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if user:
             await ctx.message.delete()
-            await self.command_user(ctx, ctx.message.content)
+            await command_user(ctx, ctx.message.content)
         if player.current:
             if player.current.stream:
                 dur = 'LIVE'
@@ -151,9 +163,10 @@ class Music(commands.Cog):
                 await ctx.send('Ничего не играет :mute:')
 
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
-    async def skip(self, ctx):
-        await ctx.message.delete()
-        await self.command_user(ctx, ctx.message.content)
+    async def skip(self, ctx, menu=False):
+        if not menu:
+            await ctx.message.delete()
+            await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет и да... :mute:')
@@ -164,7 +177,7 @@ class Music(commands.Cog):
     async def repeat(self, ctx, menu=False):
         if not menu:
             await ctx.message.delete()
-            await self.command_user(ctx, ctx.message.content)
+            await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
@@ -173,9 +186,10 @@ class Music(commands.Cog):
         await ctx.send('🔁 | ' + ('Песни крутятся' if player.repeat else 'Песни не крутятся'))
 
     @commands.command(name='pause', aliases=['resume'], help='get song paused')
-    async def pause(self, ctx):
-        await ctx.message.delete()
-        await self.command_user(ctx, ctx.message.content)
+    async def pause(self, ctx, menu):
+        if not menu:
+            await ctx.message.delete()
+            await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
@@ -189,7 +203,7 @@ class Music(commands.Cog):
     @commands.command(name='remove', aliases=['pop'])
     async def remove(self, ctx, index: int):
         await ctx.message.delete()
-        await self.command_user(ctx, ctx.message.content)
+        await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Nothing queued :cd:')
@@ -202,7 +216,7 @@ class Music(commands.Cog):
     @commands.command(name='text', help='lyric')
     async def text(self, ctx):
         await ctx.message.delete()
-        await self.command_user(ctx, ctx.message.content)
+        await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         for msg in await get_lyric(player.current.title):
             await ctx.send(msg)

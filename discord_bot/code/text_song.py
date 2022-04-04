@@ -35,6 +35,12 @@ async def parser_lyric(url):
         print(e)
 
 
+async def album(url):
+    r = requests.get(url)
+    soup = BeautifulSoup(r.content, 'lxml')
+    songs = soup.select('div[class^="Lyrics__Container"], .song_body-lyrics p')
+
+
 async def get_lyric(song):
     search_song = await get_normal_title(song)
     r = requests.get('https://www.google.com/search?q=',
@@ -50,5 +56,3 @@ async def get_lyric(song):
     elif "albums" in url:
         return ["it's album"]
     return ["**Не найдено на https://genius.com/**"]
-
-
