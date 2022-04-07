@@ -28,13 +28,20 @@ class Music(commands.Cog):
         self.msg_now = None
 
     @commands.command(name="menu")
-    async def menu(self, ctx, again=False):
+    async def menu(self, ctx, again=False, pause=False):
+        pause_flag = pause
         if not again:
             await ctx.message.delete()
             await command_user(ctx, ctx.message.content)
+        if not pause:
+            pause_str = "Остановить"
+            pause_emoji = "⏸"
+        else:
+            pause_str = "Продолжить"
+            pause_emoji = "▶"
         btns = await ctx.send(components=[Button(label="Повторить", emoji="🔄"),
                                           Button(label="Следующий", emoji="⏭"),
-                                          Button(label="Остановить", emoji="▶"),
+                                          Button(label=pause_str, emoji=pause_emoji),
                                           ])
         responce = await self.bot.wait_for("button_click")
         if responce.channel == ctx.channel:
@@ -44,8 +51,12 @@ class Music(commands.Cog):
                 await self.skip(ctx, True)
             if responce.component.label == "Остановить":
                 await self.pause(ctx, True)
+                pause_flag = True
+            if responce.component.label == "Продолжить":
+                await self.pause(ctx, True)
+                pause_flag = False
             await btns.delete()
-            await self.menu(ctx, True)
+            await self.menu(ctx, True, pause_flag)
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
