@@ -1,7 +1,7 @@
 import math
 import os
 import discord
-from discord_components import DiscordComponents, SelectOption, Select, ButtonStyle, Button
+from discord_components import Button
 from discord.ext import commands
 import lavalink
 from discord import utils
@@ -14,6 +14,10 @@ async def command_user(ctx, msg):
                                                               f"{ctx.message.author.display_name}  |  "
                                                               f"<{msg}>")
     await ctx.send(embed=em)
+
+
+async def stop(ctx, ch):
+    print("need leave")
 
 
 class Music(commands.Cog):
@@ -42,7 +46,7 @@ class Music(commands.Cog):
         btns = await ctx.send(components=[Button(label="Повторить", emoji="🔄"),
                                           Button(label="Следующий", emoji="⏭"),
                                           Button(label=pause_str, emoji=pause_emoji),
-                                          ])
+                                          Button(label="Текст песни", emoji="📖")])
         responce = await self.bot.wait_for("button_click")
         if responce.channel == ctx.channel:
             if responce.component.label == "Повторить":
@@ -55,6 +59,8 @@ class Music(commands.Cog):
             if responce.component.label == "Продолжить":
                 await self.pause(ctx, True)
                 pause_flag = False
+            if responce.component.label == "Текст песни":
+                await self.text(ctx, True)
             await btns.delete()
             await self.menu(ctx, True, pause_flag)
 
@@ -102,6 +108,7 @@ class Music(commands.Cog):
             self.ctx = ctx
         if not player.is_playing:
             await player.play()
+            await self.menu(ctx, True)
         else:
             msg = await ctx.send(embed=em)
             await msg.delete(delay=5)
@@ -133,6 +140,24 @@ class Music(commands.Cog):
                               description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
         embed.set_footer(text=f'{page}/{pages}')
         await ctx.send(embed=embed)
+
+    @commands.command(name='disconnect', aliases=['dis', 'stop', 'leave'])
+    async def disconnect(self, ctx):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+
+        if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
+            return await ctx.send('You\'re not in my voice channel :loud_sound:')
+
+        if not player.is_connected:
+            return await ctx.send('Not connected :mute:')
+
+        player.queue.clear()
+        # Stop the current track so Lavalink consumes less resources.
+        await player.stop()
+        # Disconnect from the voice channel.
+        await self.connect_to(ctx.guild.id, None)
+        await ctx.send('Disconnected :mute:')
+        await self.bot.change_presence(status=discord.Status.idle, activity=discord.Game(name="Nothing"))
 
     @commands.command(name='now', aliases=['np'])
     async def now(self, ctx, user=True):
@@ -224,9 +249,10 @@ class Music(commands.Cog):
         await ctx.send('Removed ' + removed.title + ' from the queue.')
 
     @commands.command(name='text', help='lyric')
-    async def text(self, ctx):
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
+    async def text(self, ctx, menu=False):
+        if not menu:
+            await ctx.message.delete()
+            await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         for msg in await get_lyric(player.current.title):
             await ctx.send(msg)
@@ -244,7 +270,7 @@ class Music(commands.Cog):
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voicechannel. """
         player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play',)
+        should_connect = ctx.command.name in ('play', 'pl')
 
         if not ctx.author.voice or not ctx.author.voice.channel:
             raise commands.CommandInvokeError('Join a voice channel first :loud_sound:')
@@ -271,9 +297,10 @@ class Music(commands.Cog):
             await self.connect_to(guild_id, None)
         if isinstance(event, lavalink.events.TrackStartEvent):
             print("TrackStartEvent")
-            ctx = event.player.fetch('channel')
-            if ctx:
-                ctx = self.bot.get_channel(ctx)
+            channel_id = event.player.fetch('channel')
+            print(event.player)
+            if channel_id:
+                ctx = self.bot.get_channel(channel_id)
                 if ctx:
                     em = discord.Embed(colour=discord.Colour(0xFF69B4),
                                        description=await get_normal_title(event.player.current.title))
