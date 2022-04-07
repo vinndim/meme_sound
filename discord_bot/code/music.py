@@ -260,7 +260,6 @@ class Music(commands.Cog):
                     'I need the `CONNECT` and `SPEAK` permissions. :disappointed_relieved:')
 
             player.store('channel', ctx.channel.id)
-            player.clear()
             await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
         else:
             if int(player.channel_id) != ctx.author.voice.channel.id:
