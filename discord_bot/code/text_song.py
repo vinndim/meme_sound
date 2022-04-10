@@ -1,4 +1,5 @@
 import re
+from pprint import pprint
 
 import requests
 from bs4 import BeautifulSoup
@@ -35,10 +36,15 @@ async def parser_lyric(url):
         print(e)
 
 
-async def album(url):
+async def get_album(url):
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'lxml')
-    songs = soup.select('div[class^="Lyrics__Container"], .song_body-lyrics p')
+    songs_titles = soup.select('h3[class="chart_row-content-title"]')
+    songs_links = soup.select('a[class="u-display_block"]')
+    lst_titles = [(title.get_text("\n", strip=True).split("(")[0])[:-1]
+                  for title in songs_titles]
+    lst_links = [link.get('href') for link in songs_links]
+    return lst_links, lst_titles
 
 
 async def get_lyric(song):
@@ -54,5 +60,7 @@ async def get_lyric(song):
     if url and "albums" not in url:
         return await parser_lyric(url)
     elif "albums" in url:
-        return ["it's album"]
+        return [url]
     return ["**Не найдено на https://genius.com/**"]
+
+# pprint(get_lyric('ЧУДОВИЩЕ ПОГУБИВШЕЕ МИР'))

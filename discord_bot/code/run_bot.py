@@ -18,8 +18,11 @@ async def on_ready():
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    if len(before.channel.members) == 1:
-        await stop(member, before.channel)
+    try:
+        if len(before.channel.members) == 0:
+            await stop(member, before.channel)
+    except AttributeError:
+        pass
     if before.channel is None and after.channel is not None:
         print(f'Пользователь {member} зашёл в канал {after.channel}, в канале {len(after.channel.members)}')
     elif before.channel is not None and after.channel is None:

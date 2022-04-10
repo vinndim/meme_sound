@@ -1,12 +1,15 @@
 import math
 import os
+from pprint import pprint
+
 import discord
 from discord_components import Button
 from discord.ext import commands
 import lavalink
-from discord import utils
+from discord import utils, Embed
 import aiosqlite
-from text_song import get_lyric, get_normal_title
+from text_song import get_lyric, get_normal_title, get_album, parser_lyric
+from sql_query import PLAYLIST_QUERY
 
 
 async def command_user(ctx, msg):
@@ -28,22 +31,25 @@ class Music(commands.Cog):
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
         self.db_path = os.path.abspath('../..') + "/web_site/db/users.db"
-        self.ctx = None
-        self.msg_now = None
 
     @commands.command(name="menu")
-    async def menu(self, ctx, again=False, pause=False):
+    async def menu(self, ctx, again=False, pause=False, repeat=False):
         pause_flag = pause
+        repeat_flag = repeat
         if not again:
             await ctx.message.delete()
             await command_user(ctx, ctx.message.content)
-        if not pause:
+        if not pause_flag:
             pause_str = "Остановить"
             pause_emoji = "⏸"
         else:
             pause_str = "Продолжить"
             pause_emoji = "▶"
-        btns = await ctx.send(components=[Button(label="Повторить", emoji="🔄"),
+        if not repeat_flag:
+            repeat_str = "Повторить"
+        else:
+            repeat_str = "Остановить повторение"
+        btns = await ctx.send(components=[Button(label=repeat_str, emoji="🔄"),
                                           Button(label="Следующий", emoji="⏭"),
                                           Button(label=pause_str, emoji=pause_emoji),
                                           Button(label="Текст песни", emoji="📖")])
@@ -68,9 +74,7 @@ class Music(commands.Cog):
     async def user_playlist(self, ctx, *, playlist_name):
         user_id = ctx.message.author.id
         db = await aiosqlite.connect(self.db_path)
-        cursor = await db.execute('''SELECT name FROM songs 
-        WHERE playlist_id = (SELECT id FROM playlist WHERE (name=? AND 
-        user_id=(SELECT id FROM users WHERE user_id = ?)))''', [playlist_name, user_id])
+        cursor = await db.execute(PLAYLIST_QUERY, [playlist_name, user_id])
         tracks = await cursor.fetchall()
         await cursor.close()
         await db.close()
@@ -108,7 +112,6 @@ class Music(commands.Cog):
             self.ctx = ctx
         if not player.is_playing:
             await player.play()
-            await self.menu(ctx, True)
         else:
             msg = await ctx.send(embed=em)
             await msg.delete(delay=5)
@@ -205,7 +208,7 @@ class Music(commands.Cog):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет и да... :mute:')
-        await ctx.send('⏭ | Пропущена.')
+        await ctx.send('⏭ | Пропущена.', delete_after=5)
         await player.skip()
 
     @commands.command(name='repeat', aliases=["stop repeat"])
@@ -218,7 +221,7 @@ class Music(commands.Cog):
             return await ctx.send('Ничего не играет :mute:')
         # меняем флаг повтора
         player.repeat = not player.repeat
-        await ctx.send('🔁 | ' + ('Песни крутятся' if player.repeat else 'Песни не крутятся'))
+        await ctx.send('🔁 | ' + ('Песни крутятся' if player.repeat else 'Песни не крутятся'), delete_after=5)
 
     @commands.command(name='pause', aliases=['resume'], help='get song paused')
     async def pause(self, ctx, menu):
@@ -230,10 +233,10 @@ class Music(commands.Cog):
             return await ctx.send('Ничего не играет :mute:')
         if player.paused:
             await player.set_pause(False)
-            await ctx.send('▶ | Песня возобновлена')
+            await ctx.send('▶ | Песня возобновлена', delete_after=5)
         else:
             await player.set_pause(True)
-            await ctx.send('⏸ | Песня приостановлена')
+            await ctx.send('⏸ | Песня приостановлена', delete_after=5)
 
     @commands.command(name='remove', aliases=['pop'])
     async def remove(self, ctx, index: int):
@@ -246,7 +249,7 @@ class Music(commands.Cog):
             return await ctx.send('Index has to be >=1 and <=queue size')
         index = index - 1
         removed = player.queue.pop(index)
-        await ctx.send('Removed ' + removed.title + ' from the queue.')
+        await ctx.send('Removed ' + removed.title + ' from the queue.', delete_after=5)
 
     @commands.command(name='text', help='lyric')
     async def text(self, ctx, menu=False):
@@ -254,17 +257,40 @@ class Music(commands.Cog):
             await ctx.message.delete()
             await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
+        album_flag = False
+        album_link = ""
+        query_result = ""
+
+        def check(m):
+            return m.author.id == ctx.author.id
+
         for msg in await get_lyric(player.current.title):
-            await ctx.send(msg)
+            if msg.startswith("https"):
+                album_flag = True
+                album_link = msg
+            else:
+                await ctx.send(msg)
+        if album_flag:
+            links, titles = await get_album(album_link)
+            # pprint(await get_album(album_link))
+            for n in range(len(titles)):
+                query_result = query_result + f'{n + 1} {titles[n]}\n'
+            embed = Embed(colour=discord.Colour(0xFF69B4), title="Выберите песню")
+            embed.description = query_result
+            await ctx.send(embed=embed)
+            response = await self.bot.wait_for('message', check=check)
+            for new_msg in await parser_lyric(links[int(response.content) - 1]):
+                await ctx.send(new_msg)
 
     async def cog_before_invoke(self, ctx):
-        """ Command before-invoke handler. """
         guild_check = ctx.guild is not None
-
         if guild_check:
+            player = self.bot.music.player_manager.get(ctx.guild.id)
+            try:
+                player.queue.clear()
+            except AttributeError:
+                pass
             await self.ensure_voice(ctx)
-            #  Ensure that the bot and command author share a mutual voicechannel.
-
         return guild_check
 
     async def ensure_voice(self, ctx):
@@ -314,6 +340,7 @@ class Music(commands.Cog):
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
+
 
     def cog_unload(self):
         """ Cog unload handler. This removes any event hooks that were registered. """
