@@ -41,7 +41,7 @@ async def get_album(url):
     soup = BeautifulSoup(r.content, 'lxml')
     songs_titles = soup.select('h3[class="chart_row-content-title"]')
     songs_links = soup.select('a[class="u-display_block"]')
-    lst_titles = [(title.get_text("\n", strip=True).split("(")[0])[:-1]
+    lst_titles = [(title.get_text("\n", strip=True).split("(")[0]).replace("Lyrics", "")[:-1]
                   for title in songs_titles]
     lst_links = [link.get('href') for link in songs_links]
     return lst_links, lst_titles

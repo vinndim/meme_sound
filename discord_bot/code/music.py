@@ -285,11 +285,6 @@ class Music(commands.Cog):
     async def cog_before_invoke(self, ctx):
         guild_check = ctx.guild is not None
         if guild_check:
-            player = self.bot.music.player_manager.get(ctx.guild.id)
-            try:
-                player.queue.clear()
-            except AttributeError:
-                pass
             await self.ensure_voice(ctx)
         return guild_check
 
