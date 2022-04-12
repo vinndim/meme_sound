@@ -280,7 +280,7 @@ class Music(commands.Cog):
     async def help(self, ctx):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
-        await ctx.send(embed=get_list_commands())
+        await ctx.send(embed=await get_list_commands())
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
