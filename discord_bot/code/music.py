@@ -76,7 +76,7 @@ class Music(commands.Cog):
             for query in tracks:
                 await self.add_song_to_player(query[0], ctx)
         else:
-            await ctx.send("Плейлист не найден :cry:")
+            await ctx.send("Плейлист не найден :cry:", delete_after=5)
 
     async def add_song_to_player(self, query, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
@@ -125,7 +125,7 @@ class Music(commands.Cog):
         await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.queue:
-            return await ctx.send('Ничего не добавлено :cd:')
+            return await ctx.send('Ничего не добавлено :cd:', delete_after=5)
         items_per_page = 10
         pages = math.ceil(len(player.queue) / items_per_page)
         start = (page - 1) * items_per_page
@@ -143,17 +143,17 @@ class Music(commands.Cog):
         player = self.bot.music.player_manager.get(ctx.guild.id)
 
         if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
-            return await ctx.send('You\'re not in my voice channel :loud_sound:')
+            return await ctx.send('You\'re not in my voice channel :loud_sound:', delete_after=5)
 
         if not player.is_connected:
-            return await ctx.send('Not connected :mute:')
+            return await ctx.send('Not connected :mute:', delete_after=5)
 
         player.queue.clear()
         # Stop the current track so Lavalink consumes less resources.
         await player.stop()
         # Disconnect from the voice channel.
         await self.connect_to(ctx.guild.id, None)
-        await ctx.send('Disconnected :mute:')
+        await ctx.send('Disconnected :mute:', delete_after=5)
         await self.bot.change_presence(status=discord.Status.idle, activity=discord.Game(name="Nothing"))
 
     @commands.command(name='now', aliases=['np'])
@@ -192,7 +192,7 @@ class Music(commands.Cog):
         else:
             member = utils.find(lambda m: m.id == ctx.author.id, ctx.guild.members)
             if member is not None and member.voice is not None:
-                await ctx.send('Ничего не играет :mute:')
+                await ctx.send('Ничего не играет :mute:', delete_after=5)
 
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
     async def skip(self, ctx, menu=False):
@@ -212,7 +212,7 @@ class Music(commands.Cog):
             await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
-            return await ctx.send('Ничего не играет :mute:')
+            return await ctx.send('Ничего не играет :mute:', delete_after=5)
         # меняем флаг повтора
         player.repeat = not player.repeat
         await ctx.send('🔁 | ' + ('Песни крутятся' if player.repeat else 'Песни не крутятся'), delete_after=5)
@@ -243,7 +243,7 @@ class Music(commands.Cog):
             return await ctx.send('Index has to be >=1 and <=queue size')
         index = index - 1
         removed = player.queue.pop(index)
-        await ctx.send('Removed ' + removed.title + ' from the queue.', delete_after=5)
+        await ctx.send('Удалён' + removed.title + ' из очереди.', delete_after=5)
 
     @commands.command(name='text', help='lyric')
     async def text(self, ctx, menu=False):
@@ -276,6 +276,21 @@ class Music(commands.Cog):
             for new_msg in await parser_lyric(links[int(response.content) - 1]):
                 await ctx.send(new_msg)
 
+    @commands.command(name='seek')
+    async def seek(self, ctx, seconds=None):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+        if not player.is_playing:
+            return await ctx.send('Ничего не играет :mute:')
+
+        if not seconds:
+            return await ctx.send('Укажите на сколько нужно перемотать :fast_forward:')
+        try:
+            track_time = player.position + int(seconds) * 1000
+            await player.seek(track_time)
+        except ValueError:
+            return await ctx.send('Specify valid amount of seconds :clock3:')
+        await ctx.send(f'Трек перемотан на **{lavalink.format_time(track_time)}**', delete_after=5)
+
     @commands.command(name='help')
     async def help(self, ctx):
         await ctx.message.delete()
@@ -289,8 +304,8 @@ class Music(commands.Cog):
         should_connect = ctx.command.name in ('play', 'pl')
         try:
             if not ctx.author.voice or not ctx.author.voice.channel:
-                await ctx.send("Нужно зайти в голосовой чат :loud_sound:")
-                pprint(commands.CommandInvokeError('Join a voice channel first :loud_sound:'))
+                await ctx.send("Нужно зайти в голосовой чат :loud_sound:", delete_after=5 )
+                pprint(commands.CommandInvokeError('Join a voice channel first :loud_sound:', delete_after=5))
 
             if not player.is_connected:
                 if not should_connect:
@@ -300,14 +315,14 @@ class Music(commands.Cog):
                 permissions = ctx.author.voice.channel.permissions_for(ctx.me)
 
                 if not permissions.connect or not permissions.speak:  # Check user limit too?
-                    await ctx.send("Дайте мне права, пожалуйста:disappointed_relieved:")
+                    await ctx.send("Дайте мне права, пожалуйста:disappointed_relieved:", delete_after=5)
                     pprint(commands.CommandInvokeError)
 
                 player.store('channel', ctx.channel.id)
                 await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
             else:
                 if int(player.channel_id) != ctx.author.voice.channel.id:
-                    await ctx.send("Нужно зайти в голосовой чат :disappointed_relieved:")
+                    await ctx.send("Нужно зайти в голосовой чат :disappointed_relieved:", delete_after=5)
                     pprint(commands.CommandInvokeError)
         except Exception as e:
             print(e)
