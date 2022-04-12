@@ -10,13 +10,7 @@ from discord import utils, Embed
 import aiosqlite
 from text_song import get_lyric, get_normal_title, get_album, parser_lyric
 from sql_query import PLAYLIST_QUERY
-
-
-async def command_user(ctx, msg):
-    em = discord.Embed(colour=ctx.message.author.color, title=f"Command by "
-                                                              f"{ctx.message.author.display_name}  |  "
-                                                              f"<{msg}>")
-    await ctx.send(embed=em)
+from help import command_user, get_list_commands
 
 
 async def stop(ctx, ch):
@@ -54,6 +48,7 @@ class Music(commands.Cog):
                                           Button(label=pause_str, emoji=pause_emoji),
                                           Button(label="Текст песни", emoji="📖")])
         responce = await self.bot.wait_for("button_click")
+        await btns.delete()
         if responce.channel == ctx.channel:
             if responce.component.label == "Повторить":
                 await self.repeat(ctx, True)
@@ -67,7 +62,6 @@ class Music(commands.Cog):
                 pause_flag = False
             if responce.component.label == "Текст песни":
                 await self.text(ctx, True)
-            await btns.delete()
             await self.menu(ctx, True, pause_flag)
 
     @commands.command(name="pl")
@@ -191,7 +185,7 @@ class Music(commands.Cog):
             em.set_author(name="Сейчас играет",
                           icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
-            self.msg_now = await ctx.send(embed=em, delete_after=10)
+            await ctx.send(embed=em, delete_after=10)
             await self.bot.change_presence(
                 activity=discord.Activity(type=discord.ActivityType.listening,
                                           name=await get_normal_title(player.current.title)))
@@ -223,7 +217,7 @@ class Music(commands.Cog):
         player.repeat = not player.repeat
         await ctx.send('🔁 | ' + ('Песни крутятся' if player.repeat else 'Песни не крутятся'), delete_after=5)
 
-    @commands.command(name='pause', aliases=['resume'], help='get song paused')
+    @commands.command(name='pause', aliases=['resume'])
     async def pause(self, ctx, menu):
         if not menu:
             await ctx.message.delete()
@@ -282,35 +276,41 @@ class Music(commands.Cog):
             for new_msg in await parser_lyric(links[int(response.content) - 1]):
                 await ctx.send(new_msg)
 
-    async def cog_before_invoke(self, ctx):
-        guild_check = ctx.guild is not None
-        if guild_check:
-            await self.ensure_voice(ctx)
-        return guild_check
+    @commands.command(name='help')
+    async def help(self, ctx):
+        await ctx.message.delete()
+        await command_user(ctx, ctx.message.content)
+        await ctx.send(embed=get_list_commands())
 
+    @play.before_invoke
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voicechannel. """
         player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
         should_connect = ctx.command.name in ('play', 'pl')
+        try:
+            if not ctx.author.voice or not ctx.author.voice.channel:
+                await ctx.send("Нужно зайти в голосовой чат :loud_sound:")
+                pprint(commands.CommandInvokeError('Join a voice channel first :loud_sound:'))
 
-        if not ctx.author.voice or not ctx.author.voice.channel:
-            raise commands.CommandInvokeError('Join a voice channel first :loud_sound:')
+            if not player.is_connected:
+                if not should_connect:
+                    await ctx.send("Не подключен :mute:")
+                    print(commands.CommandInvokeError)
 
-        if not player.is_connected:
-            if not should_connect:
-                raise commands.CommandInvokeError('Not connected :mute:')
+                permissions = ctx.author.voice.channel.permissions_for(ctx.me)
 
-            permissions = ctx.author.voice.channel.permissions_for(ctx.me)
+                if not permissions.connect or not permissions.speak:  # Check user limit too?
+                    await ctx.send("Дайте мне права, пожалуйста:disappointed_relieved:")
+                    pprint(commands.CommandInvokeError)
 
-            if not permissions.connect or not permissions.speak:  # Check user limit too?
-                raise commands.CommandInvokeError(
-                    'I need the `CONNECT` and `SPEAK` permissions. :disappointed_relieved:')
-
-            player.store('channel', ctx.channel.id)
-            await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
-        else:
-            if int(player.channel_id) != ctx.author.voice.channel.id:
-                raise commands.CommandInvokeError('You need to be in my voice channel :loud_sound:')
+                player.store('channel', ctx.channel.id)
+                await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
+            else:
+                if int(player.channel_id) != ctx.author.voice.channel.id:
+                    await ctx.send("Нужно зайти в голосовой чат :disappointed_relieved:")
+                    pprint(commands.CommandInvokeError)
+        except Exception as e:
+            print(e)
 
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.QueueEndEvent):
@@ -335,7 +335,6 @@ class Music(commands.Cog):
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
         await ws.voice_state(str(guild_id), channel_id)
-
 
     def cog_unload(self):
         """ Cog unload handler. This removes any event hooks that were registered. """
