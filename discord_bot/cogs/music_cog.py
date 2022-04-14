@@ -1,5 +1,4 @@
 import math
-import os
 from pprint import pprint
 
 import discord
@@ -7,14 +6,9 @@ from discord_components import Button
 from discord.ext import commands
 import lavalink
 from discord import utils, Embed
-import aiosqlite
-from text_song import get_lyric, get_normal_title, get_album, parser_lyric
-from sql_query import PLAYLIST_QUERY
-from help import command_user, get_list_commands
 
-
-async def stop(ctx, ch):
-    print("need leave")
+from discord_bot.support_code.lyric_parser import get_lyric, get_normal_title, get_album, parser_lyric
+from discord_bot.support_code.work_with_commands import command_user
 
 
 class Music(commands.Cog):
@@ -24,7 +18,6 @@ class Music(commands.Cog):
         self.bot.music.add_node('localhost', 7000, 'testing', 'in', 'music-node')
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
-        self.db_path = os.path.abspath('../..') + "/web_site/db/users.db"
 
     @commands.command(name="menu")
     async def menu(self, ctx, again=False, pause=False, repeat=False):
@@ -66,17 +59,13 @@ class Music(commands.Cog):
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
-        user_id = ctx.message.author.id
-        db = await aiosqlite.connect(self.db_path)
-        cursor = await db.execute(PLAYLIST_QUERY, [playlist_name, user_id])
-        tracks = await cursor.fetchall()
-        await cursor.close()
-        await db.close()
-        if tracks:
-            for query in tracks:
-                await self.add_song_to_player(query[0], ctx)
-        else:
-            await ctx.send("Плейлист не найден :cry:", delete_after=5)
+        pass
+        # user_id = ctx.message.author.id
+        # if tracks:
+        #     for query in tracks:
+        #         await self.add_song_to_player(query[0], ctx)
+        # else:
+        #     await ctx.send("Плейлист не найден :cry:", delete_after=5)
 
     async def add_song_to_player(self, query, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
@@ -103,7 +92,6 @@ class Music(commands.Cog):
             em.add_field(name='Duration', value=duration)
             track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
             player.add(requester=ctx.author.id, track=track)
-            self.ctx = ctx
         if not player.is_playing:
             await player.play()
         else:
@@ -140,6 +128,8 @@ class Music(commands.Cog):
 
     @commands.command(name='disconnect', aliases=['dis', 'stop', 'leave'])
     async def disconnect(self, ctx):
+        await ctx.message.delete()
+        await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
 
         if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
@@ -243,7 +233,7 @@ class Music(commands.Cog):
             return await ctx.send('Index has to be >=1 and <=queue size')
         index = index - 1
         removed = player.queue.pop(index)
-        await ctx.send('Удалён' + removed.title + ' из очереди.', delete_after=5)
+        await ctx.send('Удалён ' + removed.title + ' из очереди.', delete_after=5)
 
     @commands.command(name='text', help='lyric')
     async def text(self, ctx, menu=False):
@@ -278,6 +268,8 @@ class Music(commands.Cog):
 
     @commands.command(name='seek')
     async def seek(self, ctx, seconds=None):
+        await ctx.message.delete()
+        await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
@@ -289,13 +281,7 @@ class Music(commands.Cog):
             await player.seek(track_time)
         except ValueError:
             return await ctx.send('Specify valid amount of seconds :clock3:')
-        await ctx.send(f'Трек перемотан на **{lavalink.format_time(track_time)}**', delete_after=5)
-
-    @commands.command(name='help')
-    async def help(self, ctx):
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
-        await ctx.send(embed=await get_list_commands())
+        await ctx.send(f'Трек перемотан на **{lavalink.format_time(track_time)}**', delete_after=10)
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
@@ -304,7 +290,7 @@ class Music(commands.Cog):
         should_connect = ctx.command.name in ('play', 'pl')
         try:
             if not ctx.author.voice or not ctx.author.voice.channel:
-                await ctx.send("Нужно зайти в голосовой чат :loud_sound:", delete_after=5 )
+                await ctx.send("Нужно зайти в голосовой чат :loud_sound:", delete_after=5)
                 pprint(commands.CommandInvokeError('Join a voice channel first :loud_sound:', delete_after=5))
 
             if not player.is_connected:
@@ -324,8 +310,8 @@ class Music(commands.Cog):
                 if int(player.channel_id) != ctx.author.voice.channel.id:
                     await ctx.send("Нужно зайти в голосовой чат :disappointed_relieved:", delete_after=5)
                     pprint(commands.CommandInvokeError)
-        except Exception as e:
-            print(e)
+        except Exception:
+            pass
 
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.QueueEndEvent):
@@ -334,7 +320,6 @@ class Music(commands.Cog):
         if isinstance(event, lavalink.events.TrackStartEvent):
             print("TrackStartEvent")
             channel_id = event.player.fetch('channel')
-            print(event.player)
             if channel_id:
                 ctx = self.bot.get_channel(channel_id)
                 if ctx:
@@ -349,6 +334,7 @@ class Music(commands.Cog):
 
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
+        print(f"g_id: {guild_id}")
         await ws.voice_state(str(guild_id), channel_id)
 
     def cog_unload(self):
