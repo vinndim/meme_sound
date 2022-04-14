@@ -40,27 +40,88 @@
   overflow: hidden;
   transition: max-height 0.2s ease-out;
 }
+
+.block {
+  width: 6%;
+}
+
+.block__inner {
+  width: 100%;
+  padding-top: 100%;
+  background-color: black;
+  position: relative;
+}
+
+.image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.alert {
+    padding: 20px;
+    background-color: #f44336;
+    color: white;
+    opacity: 1;
+    transition: opacity 0.6s;
+    margin-bottom: 15px;
+}
+
+.alert.success {background-color: #4CAF50;}
+.alert.info {background-color: #2196F3;}
+.alert.warning {background-color: #ff9800;}
+
+.closebtn {
+    margin-left: 15px;
+    color: white;
+    font-weight: bold;
+    float: right;
+    font-size: 22px;
+    line-height: 20px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.closebtn:hover {
+    color: black;
+}
 </style>
 </head>
 <body>
     {% if current_user %}
          {% if playlists %}
-            <h1>Записи в блоге</h1>
+            {% if url_flag %}
+                <div class="alert info">
+                  <span class="closebtn">×</span>
+                  <strong>Info!</strong> Ссылка на сайт скопирована.
+                </div>
+            {% endif %}
+            <h1>Альбомы</h1>
             {% for playlist in playlists %}
-                <button class="accordion"><a href="/delete_playlist/{{ playlist.id }}" class="btn btn-danger">Удалить</a>{{playlist.name}} {{playlist.playlist_length}}<a type="button" class="btn btn-outline-primary btn-sm" style="text-color: white; min-width: 100px" href="/add_songs/{{playlist}}">Добавить песню в {{playlist}}</a></button>
+                <button class="accordion"><div class="block"><div class="block__inner"><img src="{{playlist.playlist_img}}" class="image"></div></div>{{playlist.name}} {{playlist.playlist_length}}{% if not playlist.yandex_song_flag %}<a type="button" class="btn btn-outline-primary btn-sm" style="text-color: white; min-width: 100px" href="/add_songs/{{playlist}}">Добавить песню в {{playlist}}</a>{% endif %}<a href="/delete_playlist/{{ playlist.id }}" class="btn btn-danger">Удалить</a></button>
                 <div class="panel">
                     {% for song in songs %}
                         <p>
                             {% if song.playlist_id == playlist.id %}
-                                {{song.name_video}} {{song.video_length}} <a href="/delete_songs/{{ song.id }}" class="btn btn-danger">Удалить</a>
+                                <img src="{{song.video_preview}}" alt="video_preview", style="width:50px; "> {{song.name_video}} {{song.video_length}} <a href="/delete_songs/{{ song.id }}" class="btn btn-danger">Удалить</a>
                             {% endif %}
                         </p>
                     {% endfor %}
                 </div>
             {% endfor %}
          <a type="button" class="btn btn-dark" href="/add_playlist">+ Добавить плейлист</a>
+         <p> </p>
+         <div>
+            <a type="button" class="btn btn-dark" href="/yandex_add">+ Добавить плейлист из Яндекс Музыки</a>
+         </div>
          {% else %}
             <a type="button" class="btn btn-dark" href="/add_playlist">+ Добавить плейлист</a>
+            <p> </p>
+            <div>
+                <a type="button" class="btn btn-dark" href="/yandex_add">+ Добавить плейлист из Яндекс Музыки</a>
+            </div>
          {% endif %}
     {% endif %}
 
@@ -78,6 +139,16 @@ for (i = 0; i < acc.length; i++) {
       panel.style.maxHeight = panel.scrollHeight + "px";
     }
   });
+}
+var close = document.getElementsByClassName("closebtn");
+var i;
+
+for (i = 0; i < close.length; i++) {
+    close[i].onclick = function(){
+        var div = this.parentElement;
+        div.style.opacity = "0";
+        setTimeout(function(){ div.style.display = "none"; }, 600);
+    }
 }
 </script>
 </body>

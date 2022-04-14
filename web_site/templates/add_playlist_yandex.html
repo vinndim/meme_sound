@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>Альбом из yandex</h1>
+<form action="" method="post">
+    {{ form.hidden_tag() }}
+    <p>
+    {{ form.url_yandex.label }}<br>
+        {{ form.url_yandex(class="form-control", type="url") }}<br>
+        {% for error in form.url_yandex.errors %}
+            <p class="alert alert-danger" role="alert">
+                {{ error }}
+            </p>
+        {% endfor %}
+    </p>
+    <p>{{ form.submit(type="submit", class="btn btn-success") }}</p>
+    {{message}}
+    {{ message }}
+</form>
+{% endblock %}

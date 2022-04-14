@@ -1,0 +1,12 @@
+.title {
+    font-family: Arial, sans-serif;
+    font-size: 4rem;
+}
+
+.title__text {
+    color: #fa709a;
+
+    background: linear-gradient(to top, #fa709a, #fee140);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}

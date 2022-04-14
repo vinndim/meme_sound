@@ -14,7 +14,9 @@
             </p>
         {% endfor %}
     </p>
-    <p>{{ form.submit(type="submit", class="btn btn-success") }}</p>
+    <p>Введите ссылку на изображение
+             {{form.img}}</p>
+    <p>{{ form.submit(type="submit", class="btn btn-success", href="/") }}</p>
     {{message}}
     {{ message }}
 </form>
