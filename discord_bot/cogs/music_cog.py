@@ -18,14 +18,15 @@ class Music(commands.Cog):
         self.bot.music.add_node('localhost', 7000, 'testing', 'in', 'music-node')
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
+        self.flags = {}
 
     @commands.command(name="menu")
     async def menu(self, ctx, again=False, pause=False, repeat=False):
+        if self.flags[ctx.guild.id]:
+            return
+        self.flags[ctx.guild.id] = True
         pause_flag = pause
         repeat_flag = repeat
-        if not again:
-            await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
         if not pause_flag:
             pause_str = "Остановить"
             pause_emoji = "⏸"
@@ -106,6 +107,7 @@ class Music(commands.Cog):
             await command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
+        await self.menu(ctx)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
