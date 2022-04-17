@@ -1,6 +1,6 @@
 from discord.ext import commands
 
-from discord_bot.support_code.config import TOKEN
+from support_code.config import TOKEN
 from discord_components import DiscordComponents
 
 bot = commands.Bot(command_prefix="!")
@@ -27,8 +27,6 @@ async def on_voice_state_update(member, before, after):
         # Бот выходит, если остаётся один в голосовом чате
         if len(before.channel.members) == 1 and before.channel.members[0].id == bot.user.id:
             guild_id = before.channel.members[0].guild.id
-            player = bot.music.player_manager.get(guild_id)
-            player.queue.clear()
             ws = bot._connection._get_websocket(guild_id)
             await ws.voice_state(str(guild_id), None)
 

@@ -22,9 +22,11 @@ class Music(commands.Cog):
 
     @commands.command(name="menu")
     async def menu(self, ctx, again=False, pause=False, repeat=False):
-        if self.flags[ctx.guild.id]:
-            return
-        self.flags[ctx.guild.id] = True
+        if ctx.guild.id in self.flags.keys():
+            if not again:
+                await ctx.message.delete()
+                await command_user(ctx, ctx.message.content)
+                await self.flags[ctx.guild.id].delete()
         pause_flag = pause
         repeat_flag = repeat
         if not pause_flag:
@@ -36,16 +38,21 @@ class Music(commands.Cog):
         if not repeat_flag:
             repeat_str = "Повторить"
         else:
-            repeat_str = "Остановить повторение"
+            repeat_str = "Не повторять"
         btns = await ctx.send(components=[Button(label=repeat_str, emoji="🔄"),
                                           Button(label="Следующий", emoji="⏭"),
                                           Button(label=pause_str, emoji=pause_emoji),
                                           Button(label="Текст песни", emoji="📖")])
+        self.flags[ctx.guild.id] = btns
         responce = await self.bot.wait_for("button_click")
         await btns.delete()
         if responce.channel == ctx.channel:
             if responce.component.label == "Повторить":
                 await self.repeat(ctx, True)
+                repeat_flag = True
+            if responce.component.label == "Не повторять":
+                await self.repeat(ctx, True)
+                repeat_flag = True
             if responce.component.label == "Следующий":
                 await self.skip(ctx, True)
             if responce.component.label == "Остановить":
@@ -56,7 +63,7 @@ class Music(commands.Cog):
                 pause_flag = False
             if responce.component.label == "Текст песни":
                 await self.text(ctx, True)
-            await self.menu(ctx, True, pause_flag)
+            await self.menu(ctx, True, pause_flag, repeat_flag)
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
@@ -107,7 +114,7 @@ class Music(commands.Cog):
             await command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
-        await self.menu(ctx)
+        await self.menu(ctx, True)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
@@ -129,23 +136,27 @@ class Music(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name='disconnect', aliases=['dis', 'stop', 'leave'])
-    async def disconnect(self, ctx):
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
+    async def disconnect(self, ctx, leave_users=False):
         player = self.bot.music.player_manager.get(ctx.guild.id)
+        if not leave_users:
+            await ctx.message.delete()
+            await command_user(ctx, ctx.message.content)
+            await self.connect_to(ctx.guild.id, None)
+            await ctx.send('Disconnected :mute:', delete_after=5)
+            if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
+                return await ctx.send('You\'re not in my voice channel :loud_sound:', delete_after=5)
 
-        if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
-            return await ctx.send('You\'re not in my voice channel :loud_sound:', delete_after=5)
-
-        if not player.is_connected:
-            return await ctx.send('Not connected :mute:', delete_after=5)
+            if not player.is_connected:
+                return await ctx.send('Not connected :mute:', delete_after=5)
+        else:
+            await ctx.send("Всем пока 🤙")
 
         player.queue.clear()
         # Stop the current track so Lavalink consumes less resources.
         await player.stop()
         # Disconnect from the voice channel.
-        await self.connect_to(ctx.guild.id, None)
-        await ctx.send('Disconnected :mute:', delete_after=5)
+        await self.flags[ctx.guild.id].delete()
+        self.flags.pop(ctx.guild.id)
         await self.bot.change_presence(status=discord.Status.idle, activity=discord.Game(name="Nothing"))
 
     @commands.command(name='now', aliases=['np'])
@@ -316,6 +327,13 @@ class Music(commands.Cog):
             pass
 
     async def track_hook(self, event):
+        print(event)
+        if isinstance(event, lavalink.events.WebSocketClosedEvent):
+            channel_id = event.player.fetch('channel')
+            if channel_id:
+                ctx = self.bot.get_channel(channel_id)
+                if ctx:
+                    await self.disconnect(ctx, True)
         if isinstance(event, lavalink.events.QueueEndEvent):
             guild_id = int(event.player.guild_id)
             await self.connect_to(guild_id, None)
