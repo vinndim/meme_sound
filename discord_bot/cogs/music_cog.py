@@ -263,14 +263,14 @@ class Music(commands.Cog):
         def check(m):
             return m.author.id == ctx.author.id
 
-        for msg in await get_lyric(player.current.title):
+        for msg in get_lyric(player.current.title):
             if msg.startswith("https"):
                 album_flag = True
                 album_link = msg
             else:
                 await ctx.send(msg)
         if album_flag:
-            links, titles = await get_album(album_link)
+            links, titles = get_album(album_link)
             # pprint(await get_album(album_link))
             for n in range(len(titles)):
                 query_result = query_result + f'{n + 1} {titles[n]}\n'
