@@ -22,11 +22,13 @@ class Music(commands.Cog):
         self.now_playing_msg = {}
 
     @commands.command(name="menu")
-    async def menu(self, ctx, again=False, pause=False, repeat=False):
+    async def menu(self, ctx, add_song=False, again=False, pause=False, repeat=False):
         if ctx.guild.id in self.menu_channel_btns.keys():
-            if not again:
+            if not again and not add_song:
                 await ctx.message.delete()
                 await command_user(ctx, ctx.message.content)
+                await self.menu_channel_btns[ctx.guild.id].delete()
+            if add_song:
                 await self.menu_channel_btns[ctx.guild.id].delete()
         pause_flag = pause
         repeat_flag = repeat
@@ -64,7 +66,7 @@ class Music(commands.Cog):
                 pause_flag = False
             if responce.component.label == "Текст песни":
                 await self.text(ctx, True)
-            await self.menu(ctx, True, pause_flag, repeat_flag)
+            await self.menu(ctx, again=True, pause=pause_flag, repeat=repeat_flag)
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name):
@@ -115,7 +117,7 @@ class Music(commands.Cog):
             await command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
-        await self.menu(ctx, True)
+        await self.menu(ctx, add_song=True)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
@@ -191,7 +193,7 @@ class Music(commands.Cog):
             await ctx.send(embed=em, delete_after=10)
             await self.bot.change_presence(
                 activity=discord.Activity(type=discord.ActivityType.listening,
-                                          name=await get_normal_title(player.current.title)))
+                                          name=get_normal_title(player.current.title)))
         else:
             member = utils.find(lambda m: m.id == ctx.author.id, ctx.guild.members)
             if member is not None and member.voice is not None:
@@ -353,13 +355,13 @@ class Music(commands.Cog):
                 if ctx:
                     player = self.bot.music.player_manager.get(ctx.guild.id)
                     em = discord.Embed(colour=discord.Colour(0xFF69B4),
-                                       description=await get_normal_title(event.player.current.title))
+                                       description=get_normal_title(event.player.current.title))
                     em.set_author(name="Сейчас играет",
                                   icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
                     em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
                     await self.bot.change_presence(
                         activity=discord.Activity(type=discord.ActivityType.listening,
-                                                  name=await get_normal_title(event.player.current.title)))
+                                                  name=get_normal_title(event.player.current.title)))
                     msg = await ctx.send(embed=em)
                     self.now_playing_msg[ctx] = msg
 

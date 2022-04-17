@@ -1,5 +1,4 @@
 import re
-from pprint import pprint
 
 import requests
 from bs4 import BeautifulSoup
@@ -7,7 +6,7 @@ from bs4 import BeautifulSoup
 site_with_lyric = "genius"
 
 
-async def get_normal_title(song_title):
+def get_normal_title(song_title):
     search_song = re.sub(r"[$#%!@*&—]", "", song_title)
     search_song = re.sub(r'\s+', ' ', search_song)
     try:
@@ -17,7 +16,7 @@ async def get_normal_title(song_title):
     return search_song
 
 
-async def parser_lyric(url):
+def parser_lyric(url):
     text = ''
     msg_text = []
     try:
@@ -36,7 +35,7 @@ async def parser_lyric(url):
         print(e)
 
 
-async def get_album(url):
+def get_album(url):
     r = requests.get(url)
     soup = BeautifulSoup(r.content, 'lxml')
     songs_titles = soup.select('h3[class="chart_row-content-title"]')
@@ -47,8 +46,8 @@ async def get_album(url):
     return lst_links, lst_titles
 
 
-async def get_lyric(song):
-    search_song = await get_normal_title(song)
+def get_lyric(song):
+    search_song = get_normal_title(song)
     r = requests.get('https://www.google.com/search?q=',
                      params={'q': f'{search_song} {site_with_lyric}'})
     soup = BeautifulSoup(r.content, 'html.parser')
@@ -58,9 +57,7 @@ async def get_lyric(song):
             url = link.get('href').split("&")[0][7:]
             break
     if url and "albums" not in url:
-        return await parser_lyric(url)
+        return parser_lyric(url)
     elif "albums" in url:
         return [url]
     return ["**Не найдено на https://genius.com/**"]
-
-# pprint(get_lyric('ЧУДОВИЩЕ ПОГУБИВШЕЕ МИР'))
