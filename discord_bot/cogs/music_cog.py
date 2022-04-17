@@ -18,15 +18,16 @@ class Music(commands.Cog):
         self.bot.music.add_node('localhost', 7000, 'testing', 'in', 'music-node')
         self.bot.add_listener(self.bot.music.voice_update_handler, 'on_socket_response')
         self.bot.music.add_event_hook(self.track_hook)
-        self.flags = {}
+        self.menu_channel_btns = {}
+        self.now_playing_msg = {}
 
     @commands.command(name="menu")
     async def menu(self, ctx, again=False, pause=False, repeat=False):
-        if ctx.guild.id in self.flags.keys():
+        if ctx.guild.id in self.menu_channel_btns.keys():
             if not again:
                 await ctx.message.delete()
                 await command_user(ctx, ctx.message.content)
-                await self.flags[ctx.guild.id].delete()
+                await self.menu_channel_btns[ctx.guild.id].delete()
         pause_flag = pause
         repeat_flag = repeat
         if not pause_flag:
@@ -43,7 +44,7 @@ class Music(commands.Cog):
                                           Button(label="Следующий", emoji="⏭"),
                                           Button(label=pause_str, emoji=pause_emoji),
                                           Button(label="Текст песни", emoji="📖")])
-        self.flags[ctx.guild.id] = btns
+        self.menu_channel_btns[ctx.guild.id] = btns
         responce = await self.bot.wait_for("button_click")
         await btns.delete()
         if responce.channel == ctx.channel:
@@ -148,15 +149,14 @@ class Music(commands.Cog):
 
             if not player.is_connected:
                 return await ctx.send('Not connected :mute:', delete_after=5)
-        else:
-            await ctx.send("Всем пока 🤙")
 
         player.queue.clear()
         # Stop the current track so Lavalink consumes less resources.
         await player.stop()
         # Disconnect from the voice channel.
-        await self.flags[ctx.guild.id].delete()
-        self.flags.pop(ctx.guild.id)
+        if ctx.guild.id in self.menu_channel_btns.keys():
+            await self.menu_channel_btns[ctx.guild.id].delete()
+            self.menu_channel_btns.pop(ctx.guild.id)
         await self.bot.change_presence(status=discord.Status.idle, activity=discord.Game(name="Nothing"))
 
     @commands.command(name='now', aliases=['np'])
@@ -295,41 +295,40 @@ class Music(commands.Cog):
         except ValueError:
             return await ctx.send('Specify valid amount of seconds :clock3:')
         await ctx.send(f'Трек перемотан на **{lavalink.format_time(track_time)}**', delete_after=10)
+        await self.now(ctx, False)
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voicechannel. """
         player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
         should_connect = ctx.command.name in ('play', 'pl')
-        try:
-            if not ctx.author.voice or not ctx.author.voice.channel:
-                await ctx.send("Нужно зайти в голосовой чат :loud_sound:", delete_after=5)
-                pprint(commands.CommandInvokeError('Join a voice channel first :loud_sound:', delete_after=5))
 
-            if not player.is_connected:
-                if not should_connect:
-                    await ctx.send("Не подключен :mute:")
-                    print(commands.CommandInvokeError)
+        if not ctx.author.voice or not ctx.author.voice.channel:
+            await ctx.send("Нужно зайти в голосовой чат :loud_sound:", delete_after=5)
+            raise commands.CommandInvokeError("Нужно зайти в голосовой чат")
 
-                permissions = ctx.author.voice.channel.permissions_for(ctx.me)
+        if not player.is_connected:
+            if not should_connect:
+                await ctx.send("Не подключен :mute:")
+                raise commands.CommandInvokeError("Не подключен")
 
-                if not permissions.connect or not permissions.speak:  # Check user limit too?
-                    await ctx.send("Дайте мне права, пожалуйста:disappointed_relieved:", delete_after=5)
-                    pprint(commands.CommandInvokeError)
+            permissions = ctx.author.voice.channel.permissions_for(ctx.me)
 
-                player.store('channel', ctx.channel.id)
-                await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
-            else:
-                if int(player.channel_id) != ctx.author.voice.channel.id:
-                    await ctx.send("Нужно зайти в голосовой чат :disappointed_relieved:", delete_after=5)
-                    pprint(commands.CommandInvokeError)
-        except Exception:
-            pass
+            if not permissions.connect or not permissions.speak:  # Check user limit too?
+                await ctx.send("Дайте мне права, пожалуйста:disappointed_relieved:", delete_after=5)
+                raise commands.CommandInvokeError("Нет прав")
+
+            player.store('channel', ctx.channel.id)
+            await self.connect_to(ctx.guild.id, str(ctx.author.voice.channel.id))
+        else:
+            if int(player.channel_id) != ctx.author.voice.channel.id:
+                await ctx.send("Нужно зайти в голосовой чат :disappointed_relieved:", delete_after=5)
+                raise commands.CommandInvokeError("Нужно зайти в голосовой чат")
 
     async def track_hook(self, event):
-        print(event)
         if isinstance(event, lavalink.events.WebSocketClosedEvent):
             channel_id = event.player.fetch('channel')
+            print(channel_id)
             if channel_id:
                 ctx = self.bot.get_channel(channel_id)
                 if ctx:
@@ -337,20 +336,32 @@ class Music(commands.Cog):
         if isinstance(event, lavalink.events.QueueEndEvent):
             guild_id = int(event.player.guild_id)
             await self.connect_to(guild_id, None)
+        if isinstance(event, lavalink.events.TrackEndEvent):
+            print("TrackEndEvent")
+            channel_id = event.player.fetch('channel')
+            if channel_id:
+                ctx = self.bot.get_channel(channel_id)
+                if ctx in self.now_playing_msg:
+                    await self.now_playing_msg[ctx].delete()
+
         if isinstance(event, lavalink.events.TrackStartEvent):
             print("TrackStartEvent")
+
             channel_id = event.player.fetch('channel')
             if channel_id:
                 ctx = self.bot.get_channel(channel_id)
                 if ctx:
+                    player = self.bot.music.player_manager.get(ctx.guild.id)
                     em = discord.Embed(colour=discord.Colour(0xFF69B4),
                                        description=await get_normal_title(event.player.current.title))
                     em.set_author(name="Сейчас играет",
                                   icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
+                    em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
                     await self.bot.change_presence(
                         activity=discord.Activity(type=discord.ActivityType.listening,
                                                   name=await get_normal_title(event.player.current.title)))
-                    await ctx.send(embed=em, delete_after=5)
+                    msg = await ctx.send(embed=em)
+                    self.now_playing_msg[ctx] = msg
 
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
