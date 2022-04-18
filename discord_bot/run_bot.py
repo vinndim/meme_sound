@@ -3,7 +3,25 @@ from discord.ext import commands
 from support_code.config import TOKEN
 from discord_components import DiscordComponents
 
-bot = commands.Bot(command_prefix="!")
+
+def get_prefix(bot, message):
+    """A callable Prefix for our bot. This could be edited to allow per server prefixes."""
+
+    # Notice how you can use spaces in prefixes. Try to keep them simple though.
+    prefixes = ['-', '!']
+
+    # Check to see if we are outside of a guild. e.g DM's etc.
+    if not message.guild:
+        # Only allow ? to be used in DMs
+        return '?'
+
+    # If we are in a guild, we allow for the user to mention us or use any of the prefixes in our list.
+    return commands.when_mentioned_or(*prefixes)(bot, message)
+
+
+bot = commands.Bot(command_prefix=get_prefix)
+
+# дополнение к discord.py
 DiscordComponents(bot)
 
 
@@ -18,6 +36,7 @@ async def on_ready():
         bot.load_extension(cog)
 
 
+# отслеживание выхода и входа пользователей
 @bot.event
 async def on_voice_state_update(member, before, after):
     if before.channel is None and after.channel is not None:
