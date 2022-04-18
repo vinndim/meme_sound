@@ -55,7 +55,7 @@ class Music(commands.Cog):
                 repeat_flag = True
             if responce.component.label == "Не повторять":
                 await self.repeat(ctx, True)
-                repeat_flag = True
+                repeat_flag = False
             if responce.component.label == "Следующий":
                 await self.skip(ctx, True)
             if responce.component.label == "Остановить":
@@ -69,8 +69,8 @@ class Music(commands.Cog):
             await self.menu(ctx, again=True, pause=pause_flag, repeat=repeat_flag)
 
     @commands.command(name="pl")
-    async def user_playlist(self, ctx, *, playlist_name):
-        pass
+    async def user_playlist(self, ctx, *, playlist_name=None):
+        await ctx.send("Команда ещё не может работать")
         # user_id = ctx.message.author.id
         # if tracks:
         #     for query in tracks:
@@ -185,7 +185,7 @@ class Music(commands.Cog):
             bar_len = 30  # bar length
             filled_len = int(bar_len * count // float(total))
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
-            song = f'{await get_normal_title(player.current.title)}\n`{pos} {bar} {dur}`'
+            song = f'{get_normal_title(player.current.title)}\n`{pos} {bar} {dur}`'
             em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
             em.set_author(name="Сейчас играет",
                           icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
