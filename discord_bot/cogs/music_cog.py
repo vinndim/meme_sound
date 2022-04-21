@@ -22,7 +22,9 @@ class Music(commands.Cog):
         self.now_playing_msg = {}
 
     @commands.command(name="menu")
-    async def menu(self, ctx, add_song=False, again=False, pause=False, repeat=False):
+    async def menu(self, ctx,
+                   add_song=False, again=False,
+                   pause=False, repeat=False):
         if ctx.guild.id in self.menu_channel_btns.keys():
             if not again and not add_song:
                 await ctx.message.delete()
@@ -112,12 +114,13 @@ class Music(commands.Cog):
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
         query = query.strip('<>')
+        player = self.bot.music.player_manager.get(ctx.guild.id)
         if not query.startswith('http'):
             await ctx.message.delete()
             await command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
-        await self.menu(ctx, add_song=True)
+        await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):

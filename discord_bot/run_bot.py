@@ -49,5 +49,4 @@ async def on_voice_state_update(member, before, after):
             ws = bot._connection._get_websocket(guild_id)
             await ws.voice_state(str(guild_id), None)
 
-
 bot.run(TOKEN)
