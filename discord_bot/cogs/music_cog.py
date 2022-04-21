@@ -1,5 +1,4 @@
 import math
-from pprint import pprint
 
 import discord
 from discord_components import Button
@@ -8,6 +7,7 @@ import lavalink
 from discord import utils, Embed
 
 from discord_bot.support_code.lyric_parser import get_lyric, get_normal_title, get_album, parser_lyric
+from discord_bot.support_code.yandex_response import get_album_yandex
 from discord_bot.support_code.work_with_commands import command_user
 
 
@@ -30,8 +30,12 @@ class Music(commands.Cog):
                 await ctx.message.delete()
                 await command_user(ctx, ctx.message.content)
                 await self.menu_channel_btns[ctx.guild.id].delete()
+                player = self.bot.music.player_manager.get(ctx.guild.id)
+                pause = player.paused
+                repeat = player.repeat
             if add_song:
                 await self.menu_channel_btns[ctx.guild.id].delete()
+
         pause_flag = pause
         repeat_flag = repeat
         if not pause_flag:
@@ -83,6 +87,7 @@ class Music(commands.Cog):
     async def add_song_to_player(self, query, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         results = await player.node.get_tracks(query)
+        print(results)
         if not results or not results['tracks']:
             return await ctx.send('Song not found :x: Please try again :mag_right:')
         em = discord.Embed(colour=discord.Colour(0xFF69B4))
@@ -114,12 +119,23 @@ class Music(commands.Cog):
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
         query = query.strip('<>')
-        player = self.bot.music.player_manager.get(ctx.guild.id)
         if not query.startswith('http'):
             await ctx.message.delete()
             await command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
+        await self.menu(ctx, add_song=True)
+
+    @commands.command(name='yandex', aliases=['y'])
+    async def yandex_music_play(self, ctx, *, query):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+        await ctx.message.delete()
+        await command_user(ctx, ctx.message.content)
+        response = await get_album_yandex(query)
+        for song_number in range(len(response["lst_songs_titles"])):
+            query_search = f'ytsearch:{response["lst_songs_titles"][song_number]} {" ".join(response["lst_excutor_album"])}'
+            print(query_search)
+            await self.add_song_to_player(query_search, ctx)
         await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
@@ -135,7 +151,7 @@ class Music(commands.Cog):
         end = start + items_per_page
         queue_list = ''
         for i, track in enumerate(player.queue[start:end], start=start):
-            queue_list += f'`{i + 1}.` **{track.title}**\n'
+            queue_list += f'`{i + 1}.` **{get_normal_title(track.title)}**\n'
         embed = discord.Embed(colour=discord.Colour(0xFF69B4),
                               description=f'**{len(player.queue)} tracks**\n\n{queue_list}')
         embed.set_footer(text=f'{page}/{pages}')
