@@ -24,5 +24,4 @@ async def get_list_commands():
     em.add_field(name="!seek", value="Перематывает на ")
     em.add_field(name="!text", value="Выводит текст текущей песни")
     em.add_field(name="!help", value="Выводит список всех команд бота")
-
     return em

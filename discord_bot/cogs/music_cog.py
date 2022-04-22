@@ -1,7 +1,9 @@
 import asyncio
 import math
+from pprint import pprint
 
 import discord
+import requests
 from discord_components import Button
 from discord.ext import commands
 import lavalink
@@ -77,18 +79,23 @@ class Music(commands.Cog):
 
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name=None):
-        await ctx.send("Команда ещё не может работать")
-        # user_id = ctx.message.author.id
-        # if tracks:
-        #     for query in tracks:
-        #         await self.add_song_to_player(query[0], ctx)
-        # else:
-        #     await ctx.send("Плейлист не найден :cry:", delete_after=5)
-
-    async def add_song_to_player(self, query, ctx):
+        user_id = ctx.message.author.id
         player = self.bot.music.player_manager.get(ctx.guild.id)
-        results = await player.node.get_tracks(query)
-        print(results)
+        if playlist_name:
+            responce = requests.get(f"https://memesoundwebsitenew.herokuapp.com/api/{user_id}")
+            r_json = responce.json()
+            try:
+                for song in r_json[playlist_name]:
+                    await self.add_song_to_player(f'ytsearch:{song}', ctx, playlist_flag=True)
+                await ctx.send("Альбом добавлен")
+                await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
+            except KeyError:
+                await ctx.send("Плейлист не найден")
+
+    async def add_song_to_player(self, query, ctx, playlist_flag=False):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+        print(query)
+        results = await player.node.get_tracks(get_normal_title(query))
         if not results or not results['tracks']:
             return await ctx.send('Song not found :x: Please try again :mag_right:')
         em = discord.Embed(colour=discord.Colour(0xFF69B4))
@@ -114,8 +121,9 @@ class Music(commands.Cog):
         if not player.is_playing:
             await player.play()
         else:
-            msg = await ctx.send(embed=em)
-            await msg.delete(delay=10)
+            if not playlist_flag:
+                msg = await ctx.send(embed=em)
+                await msg.delete(delay=10)
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
@@ -137,7 +145,11 @@ class Music(commands.Cog):
                 query_search = f'ytsearch:{response["lst_songs_titles"][song_number]} ' \
                                f'{response["lst_executors_tr"][song_number]}'
                 print(query_search)
-            await self.add_song_to_player(query_search, ctx)
+            await self.add_song_to_player(query_search, ctx, playlist_flag=True)
+        em = discord.Embed(colour=discord.Colour(0xFF69B4), description="Альбом добавлен")
+        em.set_author(name=response["album_title"])
+        em.set_image(url=response["im_album"])
+        await ctx.send(embed=em)
         await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
@@ -199,7 +211,9 @@ class Music(commands.Cog):
             filled_len = int(bar_len * count // float(total))
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
             song = f'{get_normal_title(player.current.title)}\n`{pos} {bar} {dur}`'
-            em = discord.Embed(colour=discord.Colour(0xFF69B4))
+            em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
+            em.set_author(name="Трек",
+                          icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
             await ctx.send(embed=em, delete_after=10)
             await self.bot.change_presence(
@@ -259,6 +273,7 @@ class Music(commands.Cog):
 
         def check(m):
             return m.author.id == ctx.author.id
+
         async with ctx.typing():
             for msg in get_lyric(player.current.title):
                 if msg.startswith("https"):
@@ -311,7 +326,7 @@ class Music(commands.Cog):
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voicechannel. """
         player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'yandex', "playlsit")
+        should_connect = ctx.command.name in ('play', 'yandex', "pl")
 
         if not ctx.author.voice or not ctx.author.voice.channel:
             await ctx.send("Нужно зайти в голосовой чат :loud_sound:", delete_after=5)
@@ -374,7 +389,7 @@ class Music(commands.Cog):
                     player = self.bot.music.player_manager.get(ctx.guild.id)
                     em = discord.Embed(colour=discord.Colour(0xFF69B4),
                                        description=get_normal_title(event.player.current.title))
-                    em.set_author(name="Сейчас играет",
+                    em.set_author(name="Сейчас играет 🎵",
                                   icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
                     em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
                     await self.bot.change_presence(
