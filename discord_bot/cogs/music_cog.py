@@ -1,3 +1,4 @@
+import asyncio
 import math
 
 import discord
@@ -114,14 +115,12 @@ class Music(commands.Cog):
             await player.play()
         else:
             msg = await ctx.send(embed=em)
-            await msg.delete(delay=5)
+            await msg.delete(delay=10)
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
         query = query.strip('<>')
         if not query.startswith('http'):
-            await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
         await self.menu(ctx, add_song=True)
@@ -129,19 +128,20 @@ class Music(commands.Cog):
     @commands.command(name='yandex', aliases=['y'])
     async def yandex_music_play(self, ctx, *, query):
         player = self.bot.music.player_manager.get(ctx.guild.id)
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
         response = await get_album_yandex(query)
         for song_number in range(len(response["lst_songs_titles"])):
-            query_search = f'ytsearch:{response["lst_songs_titles"][song_number]} {" ".join(response["lst_excutor_album"])}'
-            print(query_search)
+            if response["lst_excutor_album"] is not None:
+                query_search = f'ytsearch:{response["lst_songs_titles"][song_number]} ' \
+                               f'{" ".join(response["lst_excutor_album"])}'
+            else:
+                query_search = f'ytsearch:{response["lst_songs_titles"][song_number]} ' \
+                               f'{response["lst_executors_tr"][song_number]}'
+                print(query_search)
             await self.add_song_to_player(query_search, ctx)
         await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Ничего не добавлено :cd:', delete_after=5)
@@ -161,15 +161,12 @@ class Music(commands.Cog):
     async def disconnect(self, ctx, leave_users=False):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not leave_users:
-            await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
+            if not player.is_connected:
+                return await ctx.send('Не подключён :mute:', delete_after=5)
+            if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
+                return await ctx.send('Вы не в моём голосовом чате  :loud_sound:', delete_after=5)
             await self.connect_to(ctx.guild.id, None)
             await ctx.send('Disconnected :mute:', delete_after=5)
-            if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
-                return await ctx.send('You\'re not in my voice channel :loud_sound:', delete_after=5)
-
-            if not player.is_connected:
-                return await ctx.send('Not connected :mute:', delete_after=5)
 
         player.queue.clear()
         # Stop the current track so Lavalink consumes less resources.
@@ -183,9 +180,6 @@ class Music(commands.Cog):
     @commands.command(name='now', aliases=['np'])
     async def now(self, ctx, user=True):
         player = self.bot.music.player_manager.get(ctx.guild.id)
-        if user:
-            await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
         if player.current:
             if player.current.stream:
                 dur = 'LIVE'
@@ -205,9 +199,7 @@ class Music(commands.Cog):
             filled_len = int(bar_len * count // float(total))
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
             song = f'{get_normal_title(player.current.title)}\n`{pos} {bar} {dur}`'
-            em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
-            em.set_author(name="Сейчас играет",
-                          icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
+            em = discord.Embed(colour=discord.Colour(0xFF69B4))
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
             await ctx.send(embed=em, delete_after=10)
             await self.bot.change_presence(
@@ -220,9 +212,6 @@ class Music(commands.Cog):
 
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
     async def skip(self, ctx, menu=False):
-        if not menu:
-            await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет и да... :mute:')
@@ -231,9 +220,6 @@ class Music(commands.Cog):
 
     @commands.command(name='repeat', aliases=["stop repeat"])
     async def repeat(self, ctx, menu=False):
-        if not menu:
-            await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:', delete_after=5)
@@ -243,9 +229,6 @@ class Music(commands.Cog):
 
     @commands.command(name='pause', aliases=['resume'])
     async def pause(self, ctx, menu):
-        if not menu:
-            await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
@@ -258,8 +241,6 @@ class Music(commands.Cog):
 
     @commands.command(name='remove', aliases=['pop'])
     async def remove(self, ctx, index: int):
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.queue:
             return await ctx.send('Nothing queued :cd:')
@@ -271,9 +252,6 @@ class Music(commands.Cog):
 
     @commands.command(name='text', help='lyric')
     async def text(self, ctx, menu=False):
-        if not menu:
-            await ctx.message.delete()
-            await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         album_flag = False
         album_link = ""
@@ -281,13 +259,14 @@ class Music(commands.Cog):
 
         def check(m):
             return m.author.id == ctx.author.id
-
-        for msg in get_lyric(player.current.title):
-            if msg.startswith("https"):
-                album_flag = True
-                album_link = msg
-            else:
-                await ctx.send(msg)
+        async with ctx.typing():
+            for msg in get_lyric(player.current.title):
+                if msg.startswith("https"):
+                    album_flag = True
+                    album_link = msg
+                else:
+                    await ctx.send(msg)
+            await asyncio.sleep(1)
         if album_flag:
             links, titles = get_album(album_link)
             # pprint(await get_album(album_link))
@@ -297,13 +276,13 @@ class Music(commands.Cog):
             embed.description = query_result
             await ctx.send(embed=embed)
             response = await self.bot.wait_for('message', check=check)
-            for new_msg in await parser_lyric(links[int(response.content) - 1]):
-                await ctx.send(new_msg)
+            async with ctx.typing():
+                for new_msg in await parser_lyric(links[int(response.content) - 1]):
+                    await ctx.send(new_msg)
+                await asyncio.sleep(1)
 
     @commands.command(name='seek')
     async def seek(self, ctx, seconds=None):
-        await ctx.message.delete()
-        await command_user(ctx, ctx.message.content)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
@@ -318,11 +297,21 @@ class Music(commands.Cog):
         await ctx.send(f'Трек перемотан на **{lavalink.format_time(track_time)}**', delete_after=10)
         await self.now(ctx, False)
 
-    @play.before_invoke
+    @commands.command(name='shuffle')
+    async def shuffle(self, ctx):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+
+        if not player.is_playing:
+            return await ctx.send('Ничего не играет :mute:')
+
+        player.shuffle = not player.shuffle
+
+        await ctx.send('🔀 | Shuffle ' + ('enabled' if player.shuffle else 'disabled'))
+
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voicechannel. """
         player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'pl')
+        should_connect = ctx.command.name in ('play', 'yandex', "playlsit")
 
         if not ctx.author.voice or not ctx.author.voice.channel:
             await ctx.send("Нужно зайти в голосовой чат :loud_sound:", delete_after=5)
@@ -345,6 +334,16 @@ class Music(commands.Cog):
             if int(player.channel_id) != ctx.author.voice.channel.id:
                 await ctx.send("Нужно зайти в голосовой чат :disappointed_relieved:", delete_after=5)
                 raise commands.CommandInvokeError("Нужно зайти в голосовой чат")
+
+    async def cog_before_invoke(self, ctx):
+        """ Command before-invoke handler. """
+        guild_check = ctx.guild is not None
+
+        if guild_check:
+            await self.ensure_voice(ctx)
+            #  Ensure that the bot and command author share a mutual voicechannel.
+
+        return guild_check
 
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.WebSocketClosedEvent):

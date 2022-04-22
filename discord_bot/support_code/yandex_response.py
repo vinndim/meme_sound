@@ -38,4 +38,12 @@ async def get_album_yandex(url):
     return "Альбом не найден"
 
 
+# data = asyncio.run(get_album_yandex("https://music.yandex.ru/users/dim.vinnickoff/playlists/1000"))
+# pprint(data)
 
+# sec = 0
+# for j in range(len(data["lst_songs_durations"])):
+#
+#     for i in range(len(x := data["lst_songs_durations"][j].split(':'))):
+#         sec += 60 ** i * int(x[i])
+# print(sec)
