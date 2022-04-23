@@ -1,7 +1,13 @@
 from discord.ext import commands
-
-from support_code.config import TOKEN
 from discord_components import DiscordComponents
+
+from dotenv import load_dotenv
+import os
+
+env_path = "token.env"
+load_dotenv(dotenv_path=env_path)
+TOKEN = os.getenv("TOKEN")
+print(TOKEN)
 
 
 def get_prefix(bot, message):

@@ -5,7 +5,7 @@ from discord_bot.support_code.user_info import get_info
 from discord_bot.support_code.work_with_commands import command_user, get_list_commands
 
 
-class Support(commands.Cog):
+class Help(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -34,4 +34,4 @@ class Support(commands.Cog):
 
 
 def setup(bot):
-    bot.add_cog(Support(bot))
+    bot.add_cog(Help(bot))
