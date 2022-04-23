@@ -281,7 +281,6 @@ class Music(commands.Cog):
                     album_link = msg
                 else:
                     await ctx.send(msg)
-            await asyncio.sleep(1)
         if album_flag:
             links, titles = get_album(album_link)
             # pprint(await get_album(album_link))
@@ -292,9 +291,8 @@ class Music(commands.Cog):
             await ctx.send(embed=embed)
             response = await self.bot.wait_for('message', check=check)
             async with ctx.typing():
-                for new_msg in await parser_lyric(links[int(response.content) - 1]):
+                for new_msg in parser_lyric(links[int(response.content) - 1]):
                     await ctx.send(new_msg)
-                await asyncio.sleep(1)
 
     @commands.command(name='seek')
     async def seek(self, ctx, seconds=None):
