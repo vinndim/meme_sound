@@ -1,6 +1,4 @@
-import asyncio
 import math
-from pprint import pprint
 
 import discord
 import requests
@@ -30,8 +28,6 @@ class Music(commands.Cog):
                    pause=False, repeat=False):
         if ctx.guild.id in self.menu_channel_btns.keys():
             if not again and not add_song:
-                await ctx.message.delete()
-                await command_user(ctx, ctx.message.content)
                 await self.menu_channel_btns[ctx.guild.id].delete()
                 player = self.bot.music.player_manager.get(ctx.guild.id)
                 pause = player.paused
@@ -80,7 +76,6 @@ class Music(commands.Cog):
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name=None):
         user_id = ctx.message.author.id
-        player = self.bot.music.player_manager.get(ctx.guild.id)
         if playlist_name:
             responce = requests.get(f"https://memesoundwebsitenew.herokuapp.com/api/{user_id}")
             r_json = responce.json()
@@ -92,10 +87,8 @@ class Music(commands.Cog):
                         query = f'ytsearch:{song}'
                     await self.add_song_to_player(query, ctx, playlist_flag=True)
                 await ctx.send("Альбом добавлен")
-                await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
             except KeyError:
                 await ctx.send("Плейлист не найден")
-        await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     async def add_song_to_player(self, query, ctx, playlist_flag=False):
         player = self.bot.music.player_manager.get(ctx.guild.id)
@@ -125,6 +118,7 @@ class Music(commands.Cog):
             player.add(requester=ctx.author.id, track=track)
         if not player.is_playing:
             await player.play()
+            await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
         else:
             if not playlist_flag:
                 msg = await ctx.send(embed=em)
@@ -132,16 +126,13 @@ class Music(commands.Cog):
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
-        player = self.bot.music.player_manager.get(ctx.guild.id)
         query = query.strip('<>')
         if not query.startswith('http'):
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
-        await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='yandex', aliases=['y'])
     async def yandex_music_play(self, ctx, *, query):
-        player = self.bot.music.player_manager.get(ctx.guild.id)
         response = await get_album_yandex(query)
         for song_number in range(len(response["lst_songs_titles"])):
             if response["lst_excutor_album"] is not None:
@@ -156,7 +147,6 @@ class Music(commands.Cog):
         em.set_author(name=response["album_title"])
         em.set_image(url=response["im_album"])
         await ctx.send(embed=em)
-        await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
@@ -380,12 +370,12 @@ class Music(commands.Cog):
             channel_id = event.player.fetch('channel')
             if channel_id:
                 ctx = self.bot.get_channel(channel_id)
-                if ctx in self.now_playing_msg:
+                if ctx in self.now_playing_msg.keys():
+                    print("ok")
                     await self.now_playing_msg[ctx].delete()
 
         if isinstance(event, lavalink.events.TrackStartEvent):
             print("TrackStartEvent")
-
             channel_id = event.player.fetch('channel')
             if channel_id:
                 ctx = self.bot.get_channel(channel_id)

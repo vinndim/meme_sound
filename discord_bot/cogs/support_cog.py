@@ -26,7 +26,7 @@ class Support(commands.Cog):
     async def info_about_user(self, ctx):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
-        await ctx.send("Наш сайт")
+        await ctx.send("http://memesoundwebsitenew.herokuapp.com")
 
     def cog_unload(self):
         """ Cog unload handler. This removes any event hooks that were registered. """
