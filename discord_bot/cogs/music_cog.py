@@ -60,21 +60,21 @@ class Music(commands.Cog):
         await btns.delete()
         if responce.channel == ctx.channel:
             if responce.component.label == "Повторить":
-                await self.repeat(ctx, True)
+                await self.repeat(ctx)
                 repeat_flag = True
             if responce.component.label == "Не повторять":
-                await self.repeat(ctx, True)
+                await self.repeat(ctx)
                 repeat_flag = False
             if responce.component.label == "Следующий":
-                await self.skip(ctx, True)
+                await self.skip(ctx)
             if responce.component.label == "Остановить":
-                await self.pause(ctx, True)
+                await self.pause(ctx)
                 pause_flag = True
             if responce.component.label == "Продолжить":
-                await self.pause(ctx, True)
+                await self.pause(ctx)
                 pause_flag = False
             if responce.component.label == "Текст песни":
-                await self.text(ctx, True)
+                await self.text(ctx)
             await self.menu(ctx, again=True, pause=pause_flag, repeat=repeat_flag)
 
     @commands.command(name="pl")
@@ -91,6 +91,7 @@ class Music(commands.Cog):
                 await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
             except KeyError:
                 await ctx.send("Плейлист не найден")
+        await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     async def add_song_to_player(self, query, ctx, playlist_flag=False):
         player = self.bot.music.player_manager.get(ctx.guild.id)
@@ -127,11 +128,12 @@ class Music(commands.Cog):
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
         query = query.strip('<>')
         if not query.startswith('http'):
             query = f'ytsearch:{query}'
         await self.add_song_to_player(query, ctx)
-        await self.menu(ctx, add_song=True)
+        await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='yandex', aliases=['y'])
     async def yandex_music_play(self, ctx, *, query):
@@ -190,7 +192,7 @@ class Music(commands.Cog):
         await self.bot.change_presence(status=discord.Status.idle, activity=discord.Game(name="Nothing"))
 
     @commands.command(name='now', aliases=['np'])
-    async def now(self, ctx, user=True):
+    async def now(self, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if player.current:
             if player.current.stream:
@@ -225,7 +227,7 @@ class Music(commands.Cog):
                 await ctx.send('Ничего не играет :mute:', delete_after=5)
 
     @commands.command(name='skip', aliases=['forceskip', 'fs', 'next'])
-    async def skip(self, ctx, menu=False):
+    async def skip(self, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет и да... :mute:')
@@ -233,7 +235,7 @@ class Music(commands.Cog):
         await player.skip()
 
     @commands.command(name='repeat', aliases=["stop repeat"])
-    async def repeat(self, ctx, menu=False):
+    async def repeat(self, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:', delete_after=5)
@@ -242,7 +244,7 @@ class Music(commands.Cog):
         await ctx.send('🔁 | ' + ('Песни крутятся' if player.repeat else 'Песни не крутятся'), delete_after=5)
 
     @commands.command(name='pause', aliases=['resume'])
-    async def pause(self, ctx, menu):
+    async def pause(self, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             return await ctx.send('Ничего не играет :mute:')
