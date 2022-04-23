@@ -86,7 +86,11 @@ class Music(commands.Cog):
             r_json = responce.json()
             try:
                 for song in r_json[playlist_name]:
-                    await self.add_song_to_player(f'ytsearch:{song}', ctx, playlist_flag=True)
+                    if song.startwsith("http"):
+                        query = f'ytsearch:{song}'
+                    else:
+                        query = song
+                    await self.add_song_to_player(query, ctx, playlist_flag=True)
                 await ctx.send("Альбом добавлен")
                 await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
             except KeyError:
