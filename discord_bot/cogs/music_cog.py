@@ -87,9 +87,9 @@ class Music(commands.Cog):
             try:
                 for song in r_json[playlist_name]:
                     if song.startwsith("http"):
-                        query = f'ytsearch:{song}'
-                    else:
                         query = song
+                    else:
+                        query = f'ytsearch:{song}'
                     await self.add_song_to_player(query, ctx, playlist_flag=True)
                 await ctx.send("Альбом добавлен")
                 await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
