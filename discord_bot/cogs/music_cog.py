@@ -86,7 +86,7 @@ class Music(commands.Cog):
             r_json = responce.json()
             try:
                 for song in r_json[playlist_name]:
-                    if song.startwsith("http"):
+                    if song.startswith("http"):
                         query = song
                     else:
                         query = f'ytsearch:{song}'
