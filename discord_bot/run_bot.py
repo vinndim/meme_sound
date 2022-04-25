@@ -37,7 +37,7 @@ async def on_ready():
     print('------')
     print("Bot start working...")
     bot.remove_command("help")
-    cogs = ["discord_bot.cogs.music_cog", "discord_bot.cogs.support_cog"]
+    cogs = ["discord_bot.cogs.music_cog", "discord_bot.cogs.help_cog"]
     for cog in cogs:
         bot.load_extension(cog)
 
