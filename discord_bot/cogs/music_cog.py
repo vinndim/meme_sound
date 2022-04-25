@@ -9,7 +9,6 @@ from discord import utils, Embed
 
 from discord_bot.support_code.lyric_parser import get_lyric, get_normal_title, get_album, parser_lyric
 from discord_bot.support_code.yandex_response import get_album_yandex
-from discord_bot.support_code.work_with_commands import command_user
 
 
 class Music(commands.Cog):
@@ -76,21 +75,28 @@ class Music(commands.Cog):
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, playlist_name=None):
         user_id = ctx.message.author.id
+        responce = requests.get(f"https://memesoundwebsitenew.herokuapp.com/api/{user_id}")
+        r_json = responce.json()
         if playlist_name:
-            responce = requests.get(f"https://memesoundwebsitenew.herokuapp.com/api/{user_id}")
-            r_json = responce.json()
-            try:
-                for song in r_json[playlist_name]:
-                    if song.startswith("http"):
-                        query = song
-                    else:
-                        query = f'ytsearch:{song}'
-                    await self.add_song_to_player(query, ctx, playlist_flag=True)
-                await ctx.send("Альбом добавлен")
-            except KeyError:
-                await ctx.send("Плейлист не найден")
+            for s in range(len(playlist := r_json[playlist_name])):
+                if playlist[s].startswith("http"):
+                    query_search = playlist[s]
+                else:
+                    query_search = f"ytsearch:{playlist[s].split(',')[0]}"
+                if s + 1 == len(playlist):
+                    em = discord.Embed(colour=discord.Colour(0xFF69B4), title=playlist_name,
+                                       description=f"Добавлено {len(playlist)} треков")
+                    em.set_footer(text=ctx.message.author)
+                    await ctx.send(embed=em)
+                await self.add_song_to_player(query_search, ctx, playlist_flag=True, play=s + 1 == len(playlist))
+        else:
+            em = discord.Embed(colour=discord.Colour(0xFF69B4), title="Ваши Альбомы")
+            for n, pl in enumerate(r_json.keys()):
+                em.add_field(name=f"{n+1}) {pl}", value=f"Количество треков: {len(r_json[pl])}", inline=False)
+                em.set_footer(text=ctx.message.author)
+            await ctx.send(embed=em)
 
-    async def add_song_to_player(self, query, ctx, playlist_flag=False):
+    async def add_song_to_player(self, query, ctx, playlist_flag=False, play=True):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         print(query)
         results = await player.node.get_tracks(get_normal_title(query))
@@ -114,9 +120,9 @@ class Music(commands.Cog):
             else:
                 duration = lavalink.format_time(track['info']['length']).lstrip('00:')
             em.add_field(name='Duration', value=duration)
-            track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
+            track = lavalink.models.AudioTrack(track, ctx.author.id)
             player.add(requester=ctx.author.id, track=track)
-        if not player.is_playing:
+        if not player.is_playing and play is True:
             await player.play()
             await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
         else:
@@ -134,19 +140,20 @@ class Music(commands.Cog):
     @commands.command(name='yandex', aliases=['y'])
     async def yandex_music_play(self, ctx, *, query):
         response = await get_album_yandex(query)
-        for song_number in range(len(response["lst_songs_titles"])):
+        for song_number in range(len(playlist := response["lst_songs_titles"])):
             if response["lst_excutor_album"] is not None:
-                query_search = f'ytsearch:{response["lst_songs_titles"][song_number]} ' \
+                query_search = f'ytsearch:{playlist[song_number]} ' \
                                f'{" ".join(response["lst_excutor_album"])}'
             else:
-                query_search = f'ytsearch:{response["lst_songs_titles"][song_number]} ' \
+                query_search = f'ytsearch:{playlist[song_number]} ' \
                                f'{response["lst_executors_tr"][song_number]}'
                 print(query_search)
-            await self.add_song_to_player(query_search, ctx, playlist_flag=True)
-        em = discord.Embed(colour=discord.Colour(0xFF69B4), description="Альбом добавлен")
-        em.set_author(name=response["album_title"])
-        em.set_image(url=response["im_album"])
-        await ctx.send(embed=em)
+            if song_number + 1 == len(playlist):
+                em = discord.Embed(colour=discord.Colour(0xFF69B4), description="Альбом добавлен")
+                em.set_author(name=response["album_title"])
+                em.set_image(url=response["im_album"])
+                await ctx.send(embed=em)
+            await self.add_song_to_player(query_search, ctx, playlist_flag=True, play=song_number + 1 == len(playlist))
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
@@ -261,7 +268,7 @@ class Music(commands.Cog):
         await ctx.send('Удалён ' + removed.title + ' из очереди.', delete_after=5)
 
     @commands.command(name='text', help='lyric')
-    async def text(self, ctx, menu=False):
+    async def text(self, ctx):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         album_flag = False
         album_link = ""
@@ -330,7 +337,6 @@ class Music(commands.Cog):
             if not should_connect:
                 await ctx.send("Не подключен :mute:")
                 raise commands.CommandInvokeError("Не подключен")
-
             permissions = ctx.author.voice.channel.permissions_for(ctx.me)
 
             if not permissions.connect or not permissions.speak:  # Check user limit too?
