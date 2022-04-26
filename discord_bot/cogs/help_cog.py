@@ -23,7 +23,7 @@ class Help(commands.Cog):
         await ctx.send(embed=em)
 
     @commands.command(name='site')
-    async def info_about_user(self, ctx):
+    async def get_web_site(self, ctx):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
         await ctx.send("http://memesoundwebsitenew.herokuapp.com")

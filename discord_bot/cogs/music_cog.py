@@ -1,4 +1,5 @@
 import math
+from pprint import pprint
 
 import discord
 import requests
@@ -77,28 +78,28 @@ class Music(commands.Cog):
         user_id = ctx.message.author.id
         responce = requests.get(f"https://memesoundwebsitenew.herokuapp.com/api/{user_id}")
         r_json = responce.json()
-        if playlist_name:
-            for s in range(len(playlist := r_json[playlist_name])):
-                if playlist[s].startswith("http"):
-                    query_search = playlist[s]
-                else:
-                    query_search = f"ytsearch:{playlist[s].split(',')[0]}"
-                if s + 1 == len(playlist):
-                    em = discord.Embed(colour=discord.Colour(0xFF69B4), title=playlist_name,
-                                       description=f"Добавлено {len(playlist)} треков")
+        async with ctx.typing():
+            if playlist_name:
+                for s in range(len(playlist := r_json[playlist_name])):
+                    if playlist[s].startswith("http"):
+                        query_search = playlist[s]
+                    else:
+                        query_search = f"ytsearch:{playlist[s].split(',')[0]}"
+                    if s + 1 == len(playlist):
+                        em = discord.Embed(colour=discord.Colour(0xFF69B4), title=playlist_name,
+                                           description=f"Добавлено {len(playlist)} треков")
+                        em.set_footer(text=ctx.message.author)
+                        await ctx.send(embed=em)
+                    await self.add_song_to_player(query_search, ctx, playlist_flag=True, play=s + 1 == len(playlist))
+            else:
+                em = discord.Embed(colour=discord.Colour(0xFF69B4), title="Ваши Альбомы")
+                for n, pl in enumerate(r_json.keys()):
+                    em.add_field(name=f"{n+1}) {pl}", value=f"Количество треков: {len(r_json[pl])}", inline=False)
                     em.set_footer(text=ctx.message.author)
-                    await ctx.send(embed=em)
-                await self.add_song_to_player(query_search, ctx, playlist_flag=True, play=s + 1 == len(playlist))
-        else:
-            em = discord.Embed(colour=discord.Colour(0xFF69B4), title="Ваши Альбомы")
-            for n, pl in enumerate(r_json.keys()):
-                em.add_field(name=f"{n+1}) {pl}", value=f"Количество треков: {len(r_json[pl])}", inline=False)
-                em.set_footer(text=ctx.message.author)
-            await ctx.send(embed=em)
+                await ctx.send(embed=em)
 
     async def add_song_to_player(self, query, ctx, playlist_flag=False, play=True):
         player = self.bot.music.player_manager.get(ctx.guild.id)
-        print(query)
         results = await player.node.get_tracks(get_normal_title(query))
         if not results or not results['tracks']:
             return await ctx.send('Song not found :x: Please try again :mag_right:')
@@ -107,8 +108,8 @@ class Music(commands.Cog):
             tracks = results['tracks']
             for track in tracks:
                 player.add(requester=ctx.author.id, track=track)
-            em.title = 'Playlist Enqueued!'
-            em.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} tracks'
+            em.title = 'Плейлист добавлен!'
+            em.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} треков'
         else:
             track = results['tracks'][0]
             em.title = 'Track Enqueued'
@@ -119,7 +120,7 @@ class Music(commands.Cog):
                 duration = 'Live'
             else:
                 duration = lavalink.format_time(track['info']['length']).lstrip('00:')
-            em.add_field(name='Duration', value=duration)
+            em.add_field(name='Длительность', value=duration)
             track = lavalink.models.AudioTrack(track, ctx.author.id)
             player.add(requester=ctx.author.id, track=track)
         if not player.is_playing and play is True:
@@ -139,21 +140,23 @@ class Music(commands.Cog):
 
     @commands.command(name='yandex', aliases=['y'])
     async def yandex_music_play(self, ctx, *, query):
-        response = await get_album_yandex(query)
-        for song_number in range(len(playlist := response["lst_songs_titles"])):
-            if response["lst_excutor_album"] is not None:
-                query_search = f'ytsearch:{playlist[song_number]} ' \
-                               f'{" ".join(response["lst_excutor_album"])}'
-            else:
-                query_search = f'ytsearch:{playlist[song_number]} ' \
-                               f'{response["lst_executors_tr"][song_number]}'
-                print(query_search)
-            if song_number + 1 == len(playlist):
-                em = discord.Embed(colour=discord.Colour(0xFF69B4), description="Альбом добавлен")
-                em.set_author(name=response["album_title"])
-                em.set_image(url=response["im_album"])
-                await ctx.send(embed=em)
-            await self.add_song_to_player(query_search, ctx, playlist_flag=True, play=song_number + 1 == len(playlist))
+        response = get_album_yandex(query)
+        async with ctx.typing():
+            for song_number in range(len(playlist := response["lst_songs_titles"])):
+                if response["lst_excutor_album"] is not None:
+                    query_search = f'ytsearch:{playlist[song_number]} ' \
+                                   f'{" ".join(response["lst_excutor_album"])}'
+                    print(query_search)
+                else:
+                    query_search = f'ytsearch:{playlist[song_number]} ' \
+                                   f'{response["lst_executors_tr"][song_number]}'
+                    print(query_search)
+                if song_number + 1 == len(playlist):
+                    em = discord.Embed(colour=discord.Colour(0xFF69B4), description="Альбом добавлен")
+                    em.set_author(name=response["album_title"])
+                    em.set_image(url=response["im_album"])
+                    await ctx.send(embed=em)
+                await self.add_song_to_player(query_search, ctx, playlist_flag=True, play=song_number + 1 == len(playlist))
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
@@ -260,9 +263,9 @@ class Music(commands.Cog):
     async def remove(self, ctx, index: int):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if not player.queue:
-            return await ctx.send('Nothing queued :cd:')
+            return await ctx.send('Нечего удалять :cd:')
         if index > len(player.queue) or index < 1:
-            return await ctx.send('Index has to be >=1 and <=queue size')
+            return await ctx.send('Такой песни в списке нет')
         index = index - 1
         removed = player.queue.pop(index)
         await ctx.send('Удалён ' + removed.title + ' из очереди.', delete_after=5)
@@ -309,7 +312,7 @@ class Music(commands.Cog):
             track_time = player.position + int(seconds) * 1000
             await player.seek(track_time)
         except ValueError:
-            return await ctx.send('Specify valid amount of seconds :clock3:')
+            return await ctx.send('Неправильный формат :clock3:')
         await ctx.send(f'Трек перемотан на **{lavalink.format_time(track_time)}**', delete_after=10)
         await self.now(ctx, False)
 
