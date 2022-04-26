@@ -74,26 +74,35 @@ class Music(commands.Cog):
             await self.menu(ctx, again=True, pause=pause_flag, repeat=repeat_flag)
 
     @commands.command(name="pl")
-    async def user_playlist(self, ctx, *, playlist_name=None):
+    async def user_playlist(self, ctx, *, user_playlist=None):
         user_id = ctx.message.author.id
         responce = requests.get(f"https://memesoundwebsitenew.herokuapp.com/api/{user_id}")
         r_json = responce.json()
-        if playlist_name:
-            for s in range(len(playlist := r_json[playlist_name])):
+        playlists = r_json["playlists"]
+        if user_playlist:
+            if user_playlist.isdigit():
+                playlist_name = playlists[int(user_playlist) - 1]
+            else:
+                playlist_name = user_playlist
+            for s in range(len(playlist := r_json[f'songs {playlist_name}'])):
                 if playlist[s].startswith("http"):
                     query_search = playlist[s]
                 else:
-                    query_search = f"ytsearch:{playlist[s].split(',')[0]}"
+                    query_search = f"ytsearch:{playlist[s]}"
                 if s + 1 == len(playlist):
                     em = discord.Embed(colour=discord.Colour(0xFF69B4), title=playlist_name,
                                        description=f"Добавлено {len(playlist)} треков")
+                    em.set_image(url=r_json[f'image {playlist_name}'])
+                    em.add_field(name="Длительность", value=r_json[f'length {playlist_name}'])
                     em.set_footer(text=ctx.message.author)
                     await ctx.send(embed=em)
                 await self.add_song_to_player(query_search, ctx, playlist_flag=True, play=s + 1 == len(playlist))
         else:
             em = discord.Embed(colour=discord.Colour(0xFF69B4), title="Ваши Альбомы")
-            for n, pl in enumerate(r_json.keys()):
-                em.add_field(name=f"{n + 1}) {pl}", value=f"Количество треков: {len(r_json[pl])}", inline=False)
+            for n, pl in enumerate(r_json["playlists"]):
+                em.add_field(name=f"{n + 1}) {pl}",
+                             value=f"Количество треков: {len(r_json[f'songs {pl}'])}", inline=False)
+                em.add_field(name="Длительность", value=r_json[f'length {pl}'])
                 em.set_footer(text=ctx.message.author)
             await ctx.send(embed=em)
 
@@ -144,13 +153,11 @@ class Music(commands.Cog):
             if response["lst_excutor_album"] is not None:
                 query_search = f'ytsearch:{playlist[song_number]} ' \
                                f'{" ".join(response["lst_excutor_album"])}'
-                print(query_search)
             else:
                 query_search = f'ytsearch:{playlist[song_number]} ' \
                                f'{response["lst_executors_tr"][song_number]}'
-                print(query_search)
             if song_number + 1 == len(playlist):
-                em = discord.Embed(colour=discord.Colour(0xFF69B4), description="Альбом добавлен")
+                em = discord.Embed(colour=discord.Colour(0xFF69B4), description=" ".join(response["lst_excutor_album"]) if response["lst_excutor_album"] is not None else "Ваш альбом")
                 em.set_author(name=response["album_title"])
                 em.set_image(url=response["im_album"])
                 await ctx.send(embed=em)
@@ -362,43 +369,40 @@ class Music(commands.Cog):
 
         return guild_check
 
+    async def get_ctx(self, event):
+        channel_id = event.player.fetch('channel')
+        if channel_id:
+            ctx = self.bot.get_channel(channel_id)
+            return ctx
+        return
+
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.WebSocketClosedEvent):
-            channel_id = event.player.fetch('channel')
-            print(channel_id)
-            if channel_id:
-                ctx = self.bot.get_channel(channel_id)
-                if ctx:
-                    await self.disconnect(ctx, True)
+            ctx = await self.get_ctx(event)
+            if ctx:
+                await self.disconnect(ctx, True)
         if isinstance(event, lavalink.events.QueueEndEvent):
             guild_id = int(event.player.guild_id)
             await self.connect_to(guild_id, None)
         if isinstance(event, lavalink.events.TrackEndEvent):
-            print("TrackEndEvent")
-            channel_id = event.player.fetch('channel')
-            if channel_id:
-                ctx = self.bot.get_channel(channel_id)
-                if ctx in self.now_playing_msg.keys():
-                    print("ok")
-                    await self.now_playing_msg[ctx].delete()
+            ctx = await self.get_ctx(event)
+            if ctx in self.now_playing_msg.keys():
+                await self.now_playing_msg[ctx].delete()
 
         if isinstance(event, lavalink.events.TrackStartEvent):
-            print("TrackStartEvent")
-            channel_id = event.player.fetch('channel')
-            if channel_id:
-                ctx = self.bot.get_channel(channel_id)
-                if ctx:
-                    player = self.bot.music.player_manager.get(ctx.guild.id)
-                    em = discord.Embed(colour=discord.Colour(0xFF69B4),
-                                       description=get_normal_title(event.player.current.title))
-                    em.set_author(name="Сейчас играет 🎵",
-                                  icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
-                    em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
-                    await self.bot.change_presence(
-                        activity=discord.Activity(type=discord.ActivityType.listening,
-                                                  name=get_normal_title(event.player.current.title)))
-                    msg = await ctx.send(embed=em)
-                    self.now_playing_msg[ctx] = msg
+            ctx = await self.get_ctx(event)
+            if ctx:
+                player = self.bot.music.player_manager.get(ctx.guild.id)
+                em = discord.Embed(colour=discord.Colour(0xFF69B4),
+                                   description=get_normal_title(event.player.current.title))
+                em.set_author(name="Сейчас играет 🎵",
+                              icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
+                em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
+                await self.bot.change_presence(
+                    activity=discord.Activity(type=discord.ActivityType.listening,
+                                              name=f'🎵{get_normal_title(event.player.current.title)}🎵'))
+                msg = await ctx.send(embed=em)
+                self.now_playing_msg[ctx] = msg
 
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)

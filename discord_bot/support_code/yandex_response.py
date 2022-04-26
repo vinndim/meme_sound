@@ -35,6 +35,3 @@ def get_album_yandex(url):
                     "lst_imgs_songs": None, "lst_songs_durations": lst_songs_durations}
     except Exception:
         return None
-
-
-# pprint(get_album_yandex("https://music.yandex.ru/album/12659818"))
