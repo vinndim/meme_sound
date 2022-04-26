@@ -81,9 +81,10 @@ class Music(commands.Cog):
         playlists = r_json["playlists"]
         if user_playlist:
             if user_playlist.isdigit():
-                playlist_name = playlists[int(user_playlist) - 1]
+                playlist_name = playlists[int(user_playlist) - 1]  # воспризведение плейлиста по номеру в списке
             else:
                 playlist_name = user_playlist
+            msg = await ctx.send("Альбом добавляется...")
             for s in range(len(playlist := r_json[f'songs {playlist_name}'])):
                 if playlist[s].startswith("http"):
                     query_search = playlist[s]
@@ -92,9 +93,10 @@ class Music(commands.Cog):
                 if s + 1 == len(playlist):
                     em = discord.Embed(colour=discord.Colour(0xFF69B4), title=playlist_name,
                                        description=f"Добавлено {len(playlist)} треков")
-                    em.set_image(url=r_json[f'image {playlist_name}'])
+                    em.set_thumbnail(url=r_json[f'image {playlist_name}'])
                     em.add_field(name="Длительность", value=r_json[f'length {playlist_name}'])
                     em.set_footer(text=ctx.message.author)
+                    await msg.delete()
                     await ctx.send(embed=em)
                 await self.add_song_to_player(query_search, ctx, playlist_flag=True, play=s + 1 == len(playlist))
         else:
@@ -149,6 +151,7 @@ class Music(commands.Cog):
     @commands.command(name='yandex', aliases=['y'])
     async def yandex_music_play(self, ctx, *, query):
         response = get_album_yandex(query)
+        msg = await ctx.send("Альбом загружается...")
         for song_number in range(len(playlist := response["lst_songs_titles"])):
             if response["lst_excutor_album"] is not None:
                 query_search = f'ytsearch:{playlist[song_number]} ' \
@@ -157,9 +160,16 @@ class Music(commands.Cog):
                 query_search = f'ytsearch:{playlist[song_number]} ' \
                                f'{response["lst_executors_tr"][song_number]}'
             if song_number + 1 == len(playlist):
-                em = discord.Embed(colour=discord.Colour(0xFF69B4), description=" ".join(response["lst_excutor_album"]) if response["lst_excutor_album"] is not None else "Ваш альбом")
+                em = discord.Embed(colour=discord.Colour(0xFF69B4),
+                                   description=" ".join(response["lst_excutor_album"])
+                                   if response["lst_excutor_album"] is not None
+                                   else f'Количество треков: {len(playlist)}')
                 em.set_author(name=response["album_title"])
-                em.set_image(url=response["im_album"])
+                em.set_thumbnail(url=response["im_album"])
+                em.set_footer(text="YandexMusic",
+                              icon_url="https://yastatic.net/s3/doc-binary/freeze/ru/music"
+                                       "/eb46606ef5c2f78e06c7289d712e9d7e7a3712a1.png")
+                await msg.delete()
                 await ctx.send(embed=em)
             await self.add_song_to_player(query_search, ctx, playlist_flag=True,
                                           play=song_number + 1 == len(playlist))
@@ -320,7 +330,7 @@ class Music(commands.Cog):
         except ValueError:
             return await ctx.send('Неправильный формат :clock3:')
         await ctx.send(f'Трек перемотан на **{lavalink.format_time(track_time)}**', delete_after=10)
-        await self.now(ctx, False)
+        await self.now(ctx)
 
     @commands.command(name='shuffle')
     async def shuffle(self, ctx):
@@ -331,7 +341,7 @@ class Music(commands.Cog):
 
         player.shuffle = not player.shuffle
 
-        await ctx.send('🔀 | Shuffle ' + ('enabled' if player.shuffle else 'disabled'))
+        await ctx.send('🔀 | Перемешивание ' + ('включено' if player.shuffle else 'отклчено'))
 
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voicechannel. """
