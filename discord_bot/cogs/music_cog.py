@@ -150,7 +150,7 @@ class Music(commands.Cog):
 
     @commands.command(name='yandex', aliases=['y'])
     async def yandex_music_play(self, ctx, *, query):
-        response = get_album_yandex(query)
+        response = await get_album_yandex(query)
         msg = await ctx.send("Альбом загружается...")
         for song_number in range(len(playlist := response["lst_songs_titles"])):
             if response["lst_excutor_album"] is not None:

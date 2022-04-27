@@ -26,6 +26,7 @@ async def get_list_commands():
     em.add_field(name="!seek", value="Перематывает на указанное количество секунд")
     em.add_field(name="!text", value="Выводит текст текущей песни")
     em.add_field(name="!shuffle", value="Перемешивает воспроизведение треков")
+    em.add_field(name="!site", value="Ссылка на наш сайт")
     em.add_field(name="!info", value="Информация о пользователе")
     em.add_field(name="!help", value="Выводит список всех команд бота")
     return em

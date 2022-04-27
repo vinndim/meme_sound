@@ -26,7 +26,9 @@ class Help(commands.Cog):
     async def get_web_site(self, ctx):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
-        await ctx.send("http://memesoundwebsitenew.herokuapp.com")
+        em = discord.Embed(colour=discord.Colour(0xFF69B4), title='Наш сайт',
+                           description="http://memesoundwebsitenew.herokuapp.com")
+        await ctx.send(embed=em)
 
     def cog_unload(self):
         """ Cog unload handler. This removes any event hooks that were registered. """
