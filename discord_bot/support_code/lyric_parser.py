@@ -9,10 +9,6 @@ site_with_lyric = "genius"
 def get_normal_title(song_title):
     search_song = re.sub(r"[$#%!@*&—]", "", song_title)
     search_song = re.sub(r'\s+', ' ', search_song)
-    try:
-        search_song = search_song.split("(")[0] + search_song.split(")")[1]
-    except IndexError:
-        pass
     return search_song
 
 

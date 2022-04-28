@@ -287,7 +287,7 @@ class Music(commands.Cog):
         await ctx.send('Удалён ' + removed.title + ' из очереди.', delete_after=5)
 
     @commands.command(name='text', help='lyric')
-    async def text(self, ctx):
+    async def text(self, ctx, *, query=None):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         album_flag = False
         album_link = ""
@@ -297,7 +297,7 @@ class Music(commands.Cog):
             return m.author.id == ctx.author.id
 
         async with ctx.typing():
-            for msg in get_lyric(player.current.title):
+            for msg in get_lyric(query if query is not None else player.current.title):
                 if msg.startswith("https"):
                     album_flag = True
                     album_link = msg
