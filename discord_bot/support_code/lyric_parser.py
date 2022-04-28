@@ -47,7 +47,7 @@ def get_album(url):
 
 
 def get_lyric(song):
-    search_song = song
+    search_song = get_normal_title(song)
     r = requests.get('https://www.google.com/search?q=',
                      params={'q': f'{search_song} {site_with_lyric}'})
     soup = BeautifulSoup(r.content, 'html.parser')
