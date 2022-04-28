@@ -122,10 +122,10 @@ class Music(commands.Cog):
             em.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} треков'
         else:
             track = results['tracks'][0]
-            em.title = 'Track Enqueued'
+            em.title = 'Трек добавлен'
             em.description = f'{track["info"]["title"]}'
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{track['info']['identifier']}/hqdefault.jpg")
-            em.add_field(name='Channel', value=track['info']['author'])
+            em.add_field(name='Канал', value=track['info']['author'])
             if track['info']['isStream']:
                 duration = 'Live'
             else:
