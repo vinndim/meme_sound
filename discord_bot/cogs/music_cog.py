@@ -112,9 +112,9 @@ class Music(commands.Cog):
     async def add_song_to_player(self, query, ctx, playlist_flag=False, play=True, random_track=False):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         em = discord.Embed(colour=discord.Colour(0xFF69B4))
-        results = await player.node.get_tracks(get_normal_title(query))
+        results = await player.node.get_tracks(song := get_normal_title(query))
         if not results or not results['tracks']:
-            return await ctx.send('Song not found :x: Please try again :mag_right:')
+            return await ctx.send(f'Песня {song.replace("ytsearch:", "")} не найдена :x:')
         if results['loadType'] == 'PLAYLIST_LOADED' and not random_track:
             tracks = results['tracks']
             for track in tracks:
@@ -240,8 +240,8 @@ class Music(commands.Cog):
             filled_len = int(bar_len * count // float(total))
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
             song = f'{get_normal_title(player.current.title)}\n`{pos} {bar} {dur}`'
-            em = discord.Embed(colour=discord.Colour(0xFF69B4), description="Позиция трека")
-            em.set_author(name=song,
+            em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
+            em.set_author(name="Сейчас играет",
                           icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
             await ctx.send(embed=em, delete_after=10)
@@ -409,6 +409,12 @@ class Music(commands.Cog):
         await self.add_song_to_player(ctx=ctx,
                                       query="https://www.youtube.com/playlist?list=PLY6_YYWHG4w1_CNPsjcuqkYLKnlwIhSwT",
                                       random_track=True)
+
+    # @commands.command(name='flow')
+    # async def server_pl(self, ctx, track):
+    #     await self.add_song_to_player(ctx=ctx,
+    #                                   query="https://www.youtube.com/playlist?list=PLY6_YYWHG4w1_CNPsjcuqkYLKnlwIhSwT",
+    #                                   random_track=True)
 
     async def cog_before_invoke(self, ctx):
         """ Command before-invoke handler. """
