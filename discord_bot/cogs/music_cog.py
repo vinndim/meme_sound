@@ -1,5 +1,5 @@
 import math
-from pprint import pprint
+from random import randint
 
 import discord
 import requests
@@ -62,6 +62,7 @@ class Music(commands.Cog):
                 await self.repeat(ctx)
                 repeat_flag = False
             if responce.component.label == "Следующий":
+                pause_flag = False
                 await self.skip(ctx)
             if responce.component.label == "Остановить":
                 await self.pause(ctx)
@@ -108,20 +109,24 @@ class Music(commands.Cog):
                 em.set_footer(text=ctx.message.author)
             await ctx.send(embed=em)
 
-    async def add_song_to_player(self, query, ctx, playlist_flag=False, play=True):
+    async def add_song_to_player(self, query, ctx, playlist_flag=False, play=True, random_track=False):
         player = self.bot.music.player_manager.get(ctx.guild.id)
+        em = discord.Embed(colour=discord.Colour(0xFF69B4))
         results = await player.node.get_tracks(get_normal_title(query))
         if not results or not results['tracks']:
             return await ctx.send('Song not found :x: Please try again :mag_right:')
-        em = discord.Embed(colour=discord.Colour(0xFF69B4))
-        if results['loadType'] == 'PLAYLIST_LOADED':
+        if results['loadType'] == 'PLAYLIST_LOADED' and not random_track:
             tracks = results['tracks']
             for track in tracks:
                 player.add(requester=ctx.author.id, track=track)
             em.title = 'Плейлист добавлен!'
             em.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} треков'
         else:
-            track = results['tracks'][0]
+            if random_track:
+                random_number = randint(0, len(results['tracks']) - 1)
+                track = results['tracks'][random_number]
+            else:
+                track = results['tracks'][0]
             em.title = 'Трек добавлен'
             em.description = f'{track["info"]["title"]}'
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{track['info']['identifier']}/hqdefault.jpg")
@@ -138,8 +143,8 @@ class Music(commands.Cog):
             await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
         else:
             if not playlist_flag:
-                msg = await ctx.send(embed=em)
-                await msg.delete(delay=10)
+                await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
+                await ctx.send(embed=em)
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
@@ -151,6 +156,7 @@ class Music(commands.Cog):
     @commands.command(name='yandex', aliases=['y'])
     async def yandex_music_play(self, ctx, *, query):
         response = await get_album_yandex(query)
+        player = self.bot.music.player_manager.get(ctx.guild.id)
         msg = await ctx.send("Альбом загружается...")
         for song_number in range(len(playlist := response["lst_songs_titles"])):
             if response["lst_excutor_album"] is not None:
@@ -173,6 +179,7 @@ class Music(commands.Cog):
                 await ctx.send(embed=em)
             await self.add_song_to_player(query_search, ctx, playlist_flag=True,
                                           play=song_number + 1 == len(playlist))
+        await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='queue', aliases=['q', 'playlist'])
     async def queue(self, ctx, page: int = 1):
@@ -233,8 +240,8 @@ class Music(commands.Cog):
             filled_len = int(bar_len * count // float(total))
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
             song = f'{get_normal_title(player.current.title)}\n`{pos} {bar} {dur}`'
-            em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
-            em.set_author(name="Трек",
+            em = discord.Embed(colour=discord.Colour(0xFF69B4), description="Позиция трека")
+            em.set_author(name=song,
                           icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
             await ctx.send(embed=em, delete_after=10)
@@ -274,6 +281,16 @@ class Music(commands.Cog):
         else:
             await player.set_pause(True)
             await ctx.send('⏸ | Песня приостановлена', delete_after=5)
+
+    @commands.command(name='volume', aliases=['vol'])
+    async def volume(self, ctx, volume: int = None):
+        player = self.bot.music.player_manager.get(ctx.guild.id)
+
+        if not volume:
+            return await ctx.send(f'🔈 | {player.volume}%')
+
+        await player.set_volume(volume)
+        await ctx.send(f'🔈 | Звук на {player.volume}%')
 
     @commands.command(name='remove', aliases=['pop'])
     async def remove(self, ctx, index: int):
@@ -346,7 +363,7 @@ class Music(commands.Cog):
     async def ensure_voice(self, ctx):
         """ This check ensures that the bot and command author are in the same voicechannel. """
         player = self.bot.music.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
-        should_connect = ctx.command.name in ('play', 'yandex', "pl")
+        should_connect = ctx.command.name in ('play', 'yandex', "pl", 'mp', 'gachi', 'ph', "dota")
 
         if not ctx.author.voice or not ctx.author.voice.channel:
             await ctx.send("Нужно зайти в голосовой чат :loud_sound:", delete_after=5)
@@ -368,6 +385,31 @@ class Music(commands.Cog):
             if int(player.channel_id) != ctx.author.voice.channel.id:
                 await ctx.send("Нужно зайти в голосовой чат :disappointed_relieved:", delete_after=5)
                 raise commands.CommandInvokeError("Нужно зайти в голосовой чат")
+
+    @commands.command(name='mp')
+    async def mashup(self, ctx):
+        await self.add_song_to_player(ctx=ctx,
+                                      query="https://www.youtube.com/playlist?list=PLmv4zqE8jsbfgx8jElUqkR_xTIbwwlin1",
+                                      random_track=True)
+
+    @commands.command(name='gachi')
+    async def gachi(self, ctx):
+        await self.add_song_to_player(ctx=ctx,
+                                      query="https://youtube.com/playlist?list=PLA51vWSHb3b4wbRFOafRqDMFzGm1P66zQ",
+                                      random_track=True)
+
+    @commands.command(name='ph')
+    async def phonk(self, ctx):
+        await self.add_song_to_player(ctx=ctx,
+                                      query="https://youtube.com/playlist?list=PLYoZ5NeRgzjfrhsW3ecpWbp9VLxVLwic3",
+                                      random_track=True)
+
+    @commands.command(name='dota')
+    async def dota(self, ctx):
+        await self.add_song_to_player(ctx=ctx,
+                                      query="https://www.youtube.com/playlist?list=PLY6_YYWHG4w1_CNPsjcuqkYLKnlwIhSwT",
+                                      random_track=True)
+
 
     async def cog_before_invoke(self, ctx):
         """ Command before-invoke handler. """
@@ -410,7 +452,7 @@ class Music(commands.Cog):
                 em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
                 await self.bot.change_presence(
                     activity=discord.Activity(type=discord.ActivityType.listening,
-                                              name=f'🎵{get_normal_title(event.player.current.title)}🎵'))
+                                              name=f'{get_normal_title(event.player.current.title)}'))
                 msg = await ctx.send(embed=em)
                 self.now_playing_msg[ctx] = msg
 
