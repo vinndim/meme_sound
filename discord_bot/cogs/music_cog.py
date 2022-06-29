@@ -143,8 +143,8 @@ class Music(commands.Cog):
             await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
         else:
             if not playlist_flag:
-                await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
                 await ctx.send(embed=em)
+                await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
@@ -409,7 +409,6 @@ class Music(commands.Cog):
         await self.add_song_to_player(ctx=ctx,
                                       query="https://www.youtube.com/playlist?list=PLY6_YYWHG4w1_CNPsjcuqkYLKnlwIhSwT",
                                       random_track=True)
-
 
     async def cog_before_invoke(self, ctx):
         """ Command before-invoke handler. """
