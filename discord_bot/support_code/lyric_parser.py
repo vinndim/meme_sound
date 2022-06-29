@@ -27,8 +27,10 @@ def parser_lyric(url):
                 text = text[2000:]
             msg_text.append(text)
             return msg_text
+        return ["**Не найдено на https://genius.com/**"]
     except Exception as e:
         print(e)
+        return ["**Не найдено на https://genius.com/**"]
 
 
 def get_album(url):
