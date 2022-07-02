@@ -1,3 +1,4 @@
+import asyncio
 from pprint import pprint
 import aiohttp
 from bs4 import BeautifulSoup
@@ -17,7 +18,7 @@ async def get_album_yandex(url):
                                        for dur in songs_durations]
                 if url.count("/") > 4:
                     album_title = soup.select_one('h1').text
-                    im_album = "https:" + soup.select_one('img[class="playlist-cover__img deco-pane"]').get("src")
+                    im_album = "https://music.yandex.ru/blocks/playlist-cover/playlist-cover_like.png"
                     im_songs = soup.select('img[class="entity-cover__image deco-pane"]')
                     lst_imgs_songs = ["https:" + im.get("src") for im in im_songs]
                     songs_executors = soup.select('span[class="d-track__artists"]')
@@ -35,5 +36,8 @@ async def get_album_yandex(url):
                     return {"album_title": album_title, "lst_excutor_album": lst_excutor_album,
                             "im_album": im_album, "lst_songs_titles": lst_songs_titles, "lst_executors_tr": None,
                             "lst_imgs_songs": None, "lst_songs_durations": lst_songs_durations}
-    except Exception:
+    except Exception as e:
+        print(e)
         return None
+
+# pprint(asyncio.run(get_album_yandex('https://music.yandex.ru/users/n1k1ch2005/playlists/1000')))

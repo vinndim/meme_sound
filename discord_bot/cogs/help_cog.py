@@ -27,7 +27,7 @@ class Help(commands.Cog):
         await ctx.message.delete()
         await command_user(ctx, ctx.message.content)
         em = discord.Embed(colour=discord.Colour(0xFF69B4), title='Наш сайт',
-                           description="http://memesoundwebsitenew.herokuapp.com")
+                           description="http://memesoundwebsite.herokuapp.com")
         await ctx.send(embed=em)
 
     def cog_unload(self):

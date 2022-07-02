@@ -77,7 +77,7 @@ class Music(commands.Cog):
     @commands.command(name="pl")
     async def user_playlist(self, ctx, *, user_playlist=None):
         user_id = ctx.message.author.id
-        responce = requests.get(f"https://memesoundwebsitenew.herokuapp.com/api/{user_id}")
+        responce = requests.get(f"https://memesoundwebsite.herokuapp.com/api/{user_id}")
         r_json = responce.json()
         playlists = r_json["playlists"]
         if user_playlist:
@@ -144,7 +144,7 @@ class Music(commands.Cog):
         else:
             if not playlist_flag:
                 await ctx.send(embed=em)
-                await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
+                # await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
 
     @commands.command(name='play', aliases=['p', 'sing', '100-7'])
     async def play(self, ctx, *, query):
@@ -158,7 +158,11 @@ class Music(commands.Cog):
         response = await get_album_yandex(query)
         player = self.bot.music.player_manager.get(ctx.guild.id)
         msg = await ctx.send("Альбом загружается...")
-        for song_number in range(len(playlist := response["lst_songs_titles"])):
+        if response["lst_executors_tr"] is None:
+            playlist = response['lst_songs_titles']
+        else:
+            playlist = response["lst_executors_tr"]
+        for song_number in range(len(playlist)):
             if response["lst_excutor_album"] is not None:
                 query_search = f'ytsearch:{playlist[song_number]} ' \
                                f'{" ".join(response["lst_excutor_album"])}'
@@ -207,10 +211,11 @@ class Music(commands.Cog):
             if not ctx.author.voice or (player.is_connected and ctx.author.voice.channel.id != int(player.channel_id)):
                 return await ctx.send('Вы не в моём голосовом чате  :loud_sound:', delete_after=5)
             await self.connect_to(ctx.guild.id, None)
-            await ctx.send('Disconnected :mute:', delete_after=5)
+            await ctx.send('Отключен :mute:', delete_after=5)
 
         player.queue.clear()
         # Stop the current track so Lavalink consumes less resources.
+        print(self.menu_channel_btns.keys())
         await player.stop()
         # Disconnect from the voice channel.
         if ctx.guild.id in self.menu_channel_btns.keys():
@@ -388,20 +393,27 @@ class Music(commands.Cog):
 
     @commands.command(name='mp')
     async def mashup(self, ctx):
+        playlists = ('https://youtube.com/playlist?list=PLVuMkE7ik-_OQMhz_dfC1-LHdJqjJhrbv',
+                     "https://www.youtube.com/playlist?list=PLmv4zqE8jsbfgx8jElUqkR_xTIbwwlin1",
+                     "https://youtube.com/playlist?list=PL38lkblVbb0G6BKn8JFVmKXAG72_FdhI5")
         await self.add_song_to_player(ctx=ctx,
-                                      query="https://www.youtube.com/playlist?list=PLmv4zqE8jsbfgx8jElUqkR_xTIbwwlin1",
+                                      query=playlists[randint(0, 2)],
                                       random_track=True)
 
     @commands.command(name='gachi')
     async def gachi(self, ctx):
+        playlists = ('https://www.youtube.com/watch?v=Szyx0aFQDnA&list=PLSv7Sd0hjtkmfXH-Yp4WHzKUqVRkh78cf',
+                     'https://youtube.com/playlist?list=PLA51vWSHb3b4wbRFOafRqDMFzGm1P66zQ')
         await self.add_song_to_player(ctx=ctx,
-                                      query="https://youtube.com/playlist?list=PLA51vWSHb3b4wbRFOafRqDMFzGm1P66zQ",
+                                      query=playlists[randint(0, 1)],
                                       random_track=True)
 
     @commands.command(name='ph')
     async def phonk(self, ctx):
+        playlists = ('https://youtube.com/playlist?list=PLVHr-EkQ_tTPef8vm-ZrANoNGbz6ol8yh',
+                     'https://youtube.com/playlist?list=PLYoZ5NeRgzjfrhsW3ecpWbp9VLxVLwic3')
         await self.add_song_to_player(ctx=ctx,
-                                      query="https://youtube.com/playlist?list=PLYoZ5NeRgzjfrhsW3ecpWbp9VLxVLwic3",
+                                      query=playlists[randint(0, 1)],
                                       random_track=True)
 
     @commands.command(name='dota')
@@ -410,11 +422,7 @@ class Music(commands.Cog):
                                       query="https://www.youtube.com/playlist?list=PLY6_YYWHG4w1_CNPsjcuqkYLKnlwIhSwT",
                                       random_track=True)
 
-    # @commands.command(name='flow')
-    # async def server_pl(self, ctx, track):
-    #     await self.add_song_to_player(ctx=ctx,
-    #                                   query="https://www.youtube.com/playlist?list=PLY6_YYWHG4w1_CNPsjcuqkYLKnlwIhSwT",
-    #                                   random_track=True)
+
 
     async def cog_before_invoke(self, ctx):
         """ Command before-invoke handler. """
@@ -435,16 +443,23 @@ class Music(commands.Cog):
 
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.WebSocketClosedEvent):
-            ctx = await self.get_ctx(event)
-            if ctx:
-                await self.disconnect(ctx, True)
+            pass
+            # ctx = await self.get_ctx(event)
+            # if ctx:
+            #     await self.disconnect(ctx, True)
         if isinstance(event, lavalink.events.QueueEndEvent):
-            guild_id = int(event.player.guild_id)
-            await self.connect_to(guild_id, None)
+            pass
+            # guild_id = int(event.player.guild_id)
+            # await self.connect_to(guild_id, None)
         if isinstance(event, lavalink.events.TrackEndEvent):
-            ctx = await self.get_ctx(event)
-            if ctx in self.now_playing_msg.keys():
-                await self.now_playing_msg[ctx].delete()
+            try:
+                ctx = await self.get_ctx(event)
+                if ctx:
+                    if ctx in self.now_playing_msg.keys():
+                        await self.now_playing_msg[ctx].delete()
+                        print("END")
+            except Exception as e:
+                print(e)
 
         if isinstance(event, lavalink.events.TrackStartEvent):
             ctx = await self.get_ctx(event)
@@ -460,6 +475,16 @@ class Music(commands.Cog):
                                               name=f'{get_normal_title(event.player.current.title)}'))
                 msg = await ctx.send(embed=em)
                 self.now_playing_msg[ctx] = msg
+        if isinstance(event, lavalink.events.TrackExceptionEvent):
+            ctx = await self.get_ctx(event)
+            if ctx:
+                player = self.bot.music.player_manager.get(ctx.guild.id)
+                await ctx.send('Ошибка загрузки')
+                # for n, track in enumerate(player.queue):
+                #     print(n, track)
+                if ctx in self.now_playing_msg.keys():
+                    await self.now_playing_msg[ctx].delete()
+                print('Exception')
 
     async def connect_to(self, guild_id: int, channel_id: str):
         ws = self.bot._connection._get_websocket(guild_id)
