@@ -21,6 +21,7 @@ class Music(commands.Cog):
         self.bot.music.add_event_hook(self.track_hook)
         self.menu_channel_btns = {}
         self.now_playing_msg = {}
+        self.last_ctx = {}
 
     @commands.command(name="menu")
     async def menu(self, ctx,
@@ -215,7 +216,6 @@ class Music(commands.Cog):
 
         player.queue.clear()
         # Stop the current track so Lavalink consumes less resources.
-        print(self.menu_channel_btns.keys())
         await player.stop()
         # Disconnect from the voice channel.
         if ctx.guild.id in self.menu_channel_btns.keys():
@@ -224,7 +224,7 @@ class Music(commands.Cog):
         await self.bot.change_presence(status=discord.Status.idle, activity=discord.Game(name="Nothing"))
 
     @commands.command(name='now', aliases=['np'])
-    async def now(self, ctx):
+    async def now(self, ctx, seek=None):
         player = self.bot.music.player_manager.get(ctx.guild.id)
         if player.current:
             if player.current.stream:
@@ -246,8 +246,8 @@ class Music(commands.Cog):
             bar = '═' * filled_len + '♫' + '─' * (bar_len - filled_len)
             song = f'{get_normal_title(player.current.title)}\n`{pos} {bar} {dur}`'
             em = discord.Embed(colour=discord.Colour(0xFF69B4), description=song)
-            em.set_author(name="Сейчас играет",
-                          icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif")
+            em.set_author(name="Сейчас играет" if seek is None else seek,
+                          icon_url="https://media.giphy.com/media/LIQKmZU1Jm1twCRYaQ/giphy.gif" if seek is None else '')
             em.set_thumbnail(url=f"http://i.ytimg.com/vi/{player.current.identifier}/hqdefault.jpg")
             await ctx.send(embed=em, delete_after=10)
             await self.bot.change_presence(
@@ -351,8 +351,7 @@ class Music(commands.Cog):
             await player.seek(track_time)
         except ValueError:
             return await ctx.send('Неправильный формат :clock3:')
-        await ctx.send(f'Трек перемотан на **{lavalink.format_time(track_time)}**', delete_after=10)
-        await self.now(ctx)
+        await self.now(ctx, seek='⏩Трек перемотан⏩')
 
     @commands.command(name='shuffle')
     async def shuffle(self, ctx):
@@ -422,14 +421,13 @@ class Music(commands.Cog):
                                       query="https://www.youtube.com/playlist?list=PLY6_YYWHG4w1_CNPsjcuqkYLKnlwIhSwT",
                                       random_track=True)
 
-
-
     async def cog_before_invoke(self, ctx):
         """ Command before-invoke handler. """
         guild_check = ctx.guild is not None
 
         if guild_check:
             await self.ensure_voice(ctx)
+            self.last_ctx[ctx.guild.id] = ctx
             #  Ensure that the bot and command author share a mutual voicechannel.
 
         return guild_check
@@ -441,23 +439,75 @@ class Music(commands.Cog):
             return ctx
         return
 
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        print(member, before.channel, after.channel)
+        if before.channel is not None and after.channel is None:
+            print(f'before:{len(before.channel.members)}')
+            # Бот выходит, если остаётся один в голосовом чате
+            if len(before.channel.members) == 1 and before.channel.members[0].id == self.bot.user.id:
+                guild_id = before.channel.members[0].guild.id
+                if self.last_ctx.keys():
+                    ctx = self.last_ctx[guild_id]
+                    player = self.bot.music.player_manager.get(guild_id)
+                    await player.set_pause(True)
+                    await self.menu_channel_btns[ctx.guild.id].delete()
+                    self.menu_channel_btns.pop(ctx.guild.id)
+                    await ctx.send('Все вышли из голосового канала. Воспроизведение остановлено | ⏸')
+
+        elif before.channel is None and after.channel is not None:
+            print(f'after:{len(after.channel.members)}')
+            if len(after.channel.members) > 1 and after.channel.members[0].id == self.bot.user.id:
+                if self.last_ctx.keys():
+                    guild_id = after.channel.members[0].guild.id
+                    ctx = self.last_ctx[guild_id]
+                    player = self.bot.music.player_manager.get(guild_id)
+                    await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
+
+        elif before.channel is not None and after.channel is not None:
+            if len(before.channel.members) == 1 and before.channel.members[0].id == self.bot.user.id:
+                guild_id = before.channel.members[0].guild.id
+                if self.last_ctx.keys():
+                    ctx = self.last_ctx[guild_id]
+                    player = self.bot.music.player_manager.get(guild_id)
+                    await player.set_pause(True)
+                    await self.menu_channel_btns[ctx.guild.id].delete()
+                    self.menu_channel_btns.pop(ctx.guild.id)
+                    await ctx.send('Все перешли в другой канал. Воспроизведение остановлено | ⏸')
+            elif len(after.channel.members) > 1 and self.bot.user in after.channel.members:
+                if self.last_ctx.keys():
+                    guild_id = after.channel.members[0].guild.id
+                    ctx = self.last_ctx[guild_id]
+                    player = self.bot.music.player_manager.get(guild_id)
+                    await self.menu(ctx, add_song=True, pause=player.paused, repeat=player.repeat)
+            elif member == self.bot.user and len(after.channel.members) == 1:
+                guild_id = after.channel.members[0].guild.id
+                ctx = self.last_ctx[guild_id]
+                player = self.bot.music.player_manager.get(guild_id)
+                await player.set_pause(True)
+                await self.menu_channel_btns[ctx.guild.id].delete()
+                self.menu_channel_btns.pop(ctx.guild.id)
+                await ctx.send('Бота переместили в другой канал. Воспроизведение остановлено | ⏸')
+            elif member == self.bot.user and len(after.channel.members) > 1:
+                guild_id = after.channel.members[0].guild.id
+                ctx = self.last_ctx[guild_id]
+                player = self.bot.music.player_manager.get(guild_id)
+                await player.set_pause(True)
+                await self.menu_channel_btns[ctx.guild.id].delete()
+                self.menu_channel_btns.pop(ctx.guild.id)
+                # await ctx.send('Бота переместили в другой канал. Воспроизведение остановлено | ⏸')
+
     async def track_hook(self, event):
-        if isinstance(event, lavalink.events.WebSocketClosedEvent):
-            pass
-            # ctx = await self.get_ctx(event)
-            # if ctx:
-            #     await self.disconnect(ctx, True)
         if isinstance(event, lavalink.events.QueueEndEvent):
-            pass
-            # guild_id = int(event.player.guild_id)
-            # await self.connect_to(guild_id, None)
+            ctx = await self.get_ctx(event)
+            if ctx:
+                await self.disconnect(ctx, True)
         if isinstance(event, lavalink.events.TrackEndEvent):
             try:
                 ctx = await self.get_ctx(event)
                 if ctx:
                     if ctx in self.now_playing_msg.keys():
                         await self.now_playing_msg[ctx].delete()
-                        print("END")
             except Exception as e:
                 print(e)
 
@@ -478,10 +528,7 @@ class Music(commands.Cog):
         if isinstance(event, lavalink.events.TrackExceptionEvent):
             ctx = await self.get_ctx(event)
             if ctx:
-                player = self.bot.music.player_manager.get(ctx.guild.id)
                 await ctx.send('Ошибка загрузки')
-                # for n, track in enumerate(player.queue):
-                #     print(n, track)
                 if ctx in self.now_playing_msg.keys():
                     await self.now_playing_msg[ctx].delete()
                 print('Exception')
